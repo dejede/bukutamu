@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DEJEDE v3.5 | Buku Tamu Modern</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+<style>
+    :root {
+        --primary: #8CA98B;
+        --primary-dark: #6b826a;
+        --bg-dark: #121212;
+        --card-bg: #1e1e1e;
+        --text-main: #e0e0e0;
+        --text-muted: #a0a0a0;
+        --border-color: #333;
+        --danger: #ff5f5f;
+        --success: #4caf50;
+        --safe-area-bottom: env(safe-area-inset-bottom);
+        
+        /* Warna Khusus Tombol Filter */
+        --color-semua: linear-gradient(135deg, #ff4d4d, #ff0000); 
+        --color-pria: linear-gradient(135deg, #ffd93d, #ffae00);  
+        --color-wanita: linear-gradient(135deg, #6BCB77, #4caf50); 
+    }
+
+body.light {
+
+    /* background utama sage soft */
+    --bg-dark: #eef3ef;
+
+    /* card warna sage putih */
+    --card-bg: #f7faf7;
+
+    /* teks utama */
+    --text-main: #2e3f35;
+
+    /* teks sekunder */
+    --text-muted: #7a8f84;
+
+    /* border lembut */
+    --border-color: #d8e2dc;
+
+}
+
+body.light .topbar{
+background:#e2ebe3;
+border-bottom:1px solid #cdd8d0;
+}
+body.light .stat-box{
+background:#f7faf7;
+border-left:4px solid #8CA98B;
+box-shadow:0 4px 8px rgba(0,0,0,0.05);
+}
+body.light .marquee-container{
+background:#8CA98B;
+color:white;
+}
+
+body.light .brand-marquee{
+background:#bbd6ba;
+color:#6b826a;
+}
+body.light th{
+background:#8CA98B;
+color:white;
+}
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+
+    body {
+        background-color: var(--bg-dark);
+        color: var(--text-main);
+        transition: all 0.3s ease;
+        line-height: 1.6;
+        padding-bottom: 90px;
+    }
+
+    /* === TOPBAR (DIPERBAIKI AGAR TIDAK HANCUR) === */
+    .topbar {
+        background: var(--card-bg);
+        padding: 0.8rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+        position: sticky; top: 0; z-index: 1000;
+        gap: 10px;
+    }
+.sticky-header{
+position:sticky;
+top:0;
+z-index:5000;
+background:var(--bg-dark);
+
+/* shadow dark mode */
+box-shadow:
+0 4px 12px rgba(255,255,255,0.06),
+0 1px 0 rgba(255,255,255,0.08);
+}
+
+.dashboard{
+padding-bottom:10px;
+}
+body.light .sticky-header{
+box-shadow:
+0 6px 14px rgba(0,0,0,0.12);
+}
+    .logo-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+        min-width: fit-content;
+    }
+
+    .main-logo {
+        height: 38px; /* Ukuran pas untuk header */
+        width: auto;
+    }
+
+    .logo { 
+        font-weight: 700; 
+        font-size: 1.1rem; 
+        color: var(--primary); 
+        line-height: 1.2;
+    }
+    
+    .logo span { 
+        font-weight: 300; 
+        font-size: 0.7rem; 
+        display: block; 
+        color: var(--text-muted); 
+    }
+
+    /* === JAM DIGITAL (POSISI TENGAH) === */
+    #digital-clock {
+        text-align: center;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #clock-time {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 2.2rem;
+        font-weight: bold;
+        color: #ff0000;
+        line-height: 1;
+        letter-spacing: 2px;
+    }
+
+    #clock-date {
+        font-family: Arial, sans-serif;
+        font-size: 0.7rem;
+        color: #888;
+        margin-top: 5px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-weight: normal;
+    }
+
+    /* === DASHBOARD STATS === */
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 15px;
+    }
+
+/* --- Dashboard Stats Dasar (Update: Lebih Rapi & Mobile Friendly) --- */
+.stat-box {
+    background: var(--card-bg);
+    padding: 12px 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Shadow lebih tegas */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border-left: 4px solid var(--primary);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-box:hover { 
+    transform: translateY(-3px); 
+    box-shadow: 0 6px 15px rgba(0,0,0,0.25);
+}
+
+/* --- Variasi Warna Tiap Box --- */
+/* Box 1: Total Tamu (Biru) */
+.stat-box:nth-child(1) { border-left-color: #4facfe; } 
+.stat-box:nth-child(1) strong { color: #4facfe; }
+
+/* Box 2: Total Amplop (Hijau Cerah/Cyan) */
+.stat-box:nth-child(2) { border-left-color: #00f2fe; } 
+.stat-box:nth-child(2) strong { color: #00f2fe; }
+
+/* Box 3: Rata-rata (Kuning/Emas) */
+.stat-box:nth-child(3) { border-left-color: #ffd93d; } 
+.stat-box:nth-child(3) strong { color: #ffd93d; }
+
+/* Box 4: Terakhir (Pink/Magenta) */
+.stat-box:nth-child(4) { border-left-color: #ff85e4; } 
+.stat-box:nth-child(4) strong { color: #ff85e4; }
+
+/* --- Styling Teks --- */
+.stat-box span { 
+    font-size: 0.65rem; 
+    color: var(--text-muted); 
+    text-transform: uppercase; 
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.stat-box strong { 
+    display: block; 
+    font-size: 1.1rem; /* Ukuran desktop pas */
+    margin-top: 3px; 
+    font-weight: 800;
+    white-space: nowrap; /* Biar angka tidak pecah baris */
+}
+
+/* --- Penyesuaian Mobile (Optimasi Layar Sempit) --- */
+@media (max-width: 768px) {
+    .dashboard { 
+        gap: 8px; 
+        padding: 10px; 
+        grid-template-columns: repeat(2, 1fr); /* Tetap 2 kolom */
+    }
+    
+    .stat-box { 
+        padding: 8px 10px; 
+        border-left-width: 3px; /* Garis lebih tipis di mobile */
+        min-height: 60px; /* Jaga tinggi box tetap konsisten */
+    }
+
+    .stat-box span { 
+        font-size: 0.55rem; 
+        letter-spacing: 0;
+    }
+
+    .stat-box strong { 
+        font-size: 0.85rem; /* Ukuran angka dikecilkan agar nominal Rp 1.000.000 muat */
+        margin-top: 2px;
+    }
+}
+
+    /* === LAYOUT & CARDS === */
+    .layout { display: flex; flex-direction: column; gap: 15px; padding: 0 15px; }
+    .card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 15px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 15px;
+    }
+
+    /* === PAGINATION & MODAL === */
+    #pagination { margin-top:12px; display:flex; justify-content:center; align-items:center; gap:10px; }
+    #pagination button { background:#8CA98B; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; color:white; font-size:0.8rem; }
+    #page-info { font-size:0.8rem; color:var(--text-muted); }
+    #addModal { transition: all 0.3s ease-in-out; }
+
+    /* === RUNNING TEXT (MARQUEE) === */
+    .marquee-container {
+        background: var(--primary);
+        color: white;
+        overflow: hidden;
+        white-space: nowrap;
+        padding: 8px 0;
+        font-size: 0.9rem;
+        font-weight: 500;
+        border-bottom: 1px solid var(--primary-dark);
+        display: flex;
+        align-items: center;
+    }
+
+    .marquee-content {
+        display: inline-block;
+        padding-left: 100%;
+        animation: marquee 60s linear infinite;
+        will-change: transform;
+    }
+
+    .marquee-content b { color: #fff; text-shadow: 0 0 8px rgba(255, 255, 255, 0.4); font-weight: 700; margin: 0 5px; }
+
+    .brand-marquee { background: var(--card-bg); color: var(--primary); font-size: 0.75rem; border-bottom: 1px solid var(--border-color); }
+    .brand-marquee .marquee-content { animation-duration: 45s; }
+
+    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+    .marquee-container:hover .marquee-content { animation-play-state: paused; }
+
+    /* === TABS ALA BROWSER === */
+    .tabs {
+        display: flex; gap: 5px; padding-left: 5px; overflow-x: auto; border-bottom: 2px solid var(--border-color);
+        scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab-btn {
+        padding: 8px 20px; border: 1px solid var(--border-color); border-bottom: none;
+        border-radius: 10px 10px 0 0; font-weight: 600; color: var(--text-muted);
+        background: var(--bg-dark); cursor: pointer; transition: all 0.2s ease;
+        font-size: 0.8rem; min-width: 80px; white-space: nowrap; flex-shrink: 0;
+    }
+
+    .btn-semua.active { background: var(--card-bg); color: #ff4d4d; border-top: 3px solid #ff4d4d; }
+    .btn-pria.active { background: var(--card-bg); color: #ffd93d; border-top: 3px solid #ffd93d; }
+    .btn-wanita.active { background: var(--card-bg); color: #6BCB77; border-top: 3px solid #6BCB77; }
+
+    /* === TABLE EXCEL STYLE === */
+    .table-container { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; min-width: 500px; background: var(--card-bg); }
+    th { font-size: 0.75rem; padding: 12px; color: white; background-color: #2d3436; border: 1px solid var(--border-color); text-align: left; text-transform: uppercase; }
+    td { padding: 10px; font-size: 0.85rem; border: 1px solid var(--border-color); }
+    tbody tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.03); }
+    body.light tbody tr:nth-child(even) { background-color: rgba(0, 0, 0, 0.03); }
+    tbody tr:hover { background-color: rgba(140, 169, 139, 0.15) !important; }
+    td:nth-child(5){ color:#6BCB77; font-weight:700; }
+    .subtotal-row td { background:#243024; font-weight:bold; color:#9fe29f; }
+
+    /* === FORM & BUTTONS === */
+    input, select { width: 100%; padding: 12px; margin-bottom: 10px; background: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 10px; font-size: 16px; }
+    .btn-main { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; }
+
+    /* === FLOATING NAV === */
+    .floating-nav {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        width: 90%; max-width: 450px; background: var(--card-bg); border-radius: 25px;
+        display: flex; justify-content: space-around; padding: 10px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 2000; border: 1px solid var(--border-color);
+    }
+    .nav-item { background: none; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 0.6rem; cursor: pointer; }
+    .nav-item i { font-size: 1.2rem; font-style: normal; }
+    .nav-item.active { color: var(--primary); }
+
+    /* === RESPONSIVE & MOBILE FIX === */
+    @media (max-width: 768px) {
+        #clock-time { font-size: 1.4rem; letter-spacing: 1px; }
+        #clock-date { font-size: 0.55rem; letter-spacing: 1px; margin-top: 2px; }
+        .logo span { display: none; } /* Biar ringkas di HP */
+    }
+
+    @media (min-width: 992px) {
+        .layout { display: grid; grid-template-columns: 320px 1fr; }
+        .dashboard { grid-template-columns: repeat(4, 1fr); padding: 20px 5%; }
+    }
+
+    .progress-bar { height: 8px; background: var(--border-color); border-radius: 10px; overflow: hidden; margin-top: 8px; }
+    #progress-fill { height: 100%; background: var(--primary); width: 0%; transition: 0.5s; }
+	
+/* Styling Tombol Aksi */
+.btn-edit, .btn-delete {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ffffff !important; /* Teks wajib putih */
+    transition: all 0.2s ease;
+    min-width: 65px; /* Biar lebar tombol seragam */
+    text-transform: uppercase;
+    margin: 2px;
+}
+
+/* Edit - Hijau */
+.btn-edit {
+    background-color: #4caf50;
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.btn-edit:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.5);
+}
+
+/* Delete - Merah */
+.btn-delete {
+    background-color: #ff5f5f;
+    box-shadow: 0 2px 4px rgba(255, 95, 95, 0.3);
+}
+
+.btn-delete:hover {
+    background-color: #ff4d4d;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 95, 95, 0.5);
+}
+
+/* Penyesuaian Mobile (Jari lebih mudah tekan) */
+@media (max-width: 768px) {
+    .btn-edit, .btn-delete {
+        padding: 8px 10px;
+        font-size: 0.7rem;
+        min-width: 60px;
+    }
+}
+	
+</style>
+</head>
+
+<body>
+
+<div class="sticky-header">
+
+<header class="topbar">
+    <div class="logo-wrapper">
+        <img src="images/logo.png" class="main-logo">
+        <div class="logo">DEJEDE v3.5 <span>Buku Tamu & Manajemen Amplop</span></div>
+    </div>
+    
+    <div id="digital-clock">
+        <div id="clock-time">00:00:00</div>
+        <div id="clock-date">SENIN • 01 | 01 | 2026</div>
+    </div>
+
+    <div class="top-actions">
+        <button class="btn-main" style="padding:5px 15px;font-size:0.8rem;" onclick="toggleTheme()">🌓 Tema</button>
+    </div>
+</header>
+
+<div class="marquee-container">
+    <div class="marquee-content" id="running-text-1">
+        <span id="kalimat-ucapan">Memuat info acara...</span>
+    </div>
+</div>
+
+<div class="marquee-container brand-marquee">
+    <div class="marquee-content" style="animation-duration:45s;">
+        <span>
+        ✨ <b>Abadikan Setiap Detik Berharga Bersama DEJEDE</b> - 
+        <i>"Karena Momen Takkan Terulang, Biarkan Kami Menjaganya Dalam Karya Visual Terbaik."</i> 
+        📸 Spesialis Dokumentasi Profesional & Editing High-Res. 
+        📞 <b>Reservasi: 085236578999</b>
+        </span>
+    </div>
+</div>
+
+<section class="dashboard">
+    <div class="stat-box"><span>Tamu</span><strong id="stat-tamu">0</strong></div>
+    <div class="stat-box"><span>Total</span><strong id="stat-uang">Rp 0</strong></div>
+    <div class="stat-box"><span>Rata-rata</span><strong id="stat-avg">Rp 0</strong></div>
+    <div class="stat-box"><span>Terakhir</span><strong id="stat-last">-</strong></div>
+</section>
+
+</div>
+
+<main class="layout">
+    <aside class="sidepanel">
+        <div class="card">
+            <h3>Trend Pemasukan</h3>
+            <canvas id="moneyChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h3>Top 5 Penyumbang</h3>
+            <ul id="top-donors" style="list-style:none; font-size: 0.8rem;"></ul>
+        </div>
+
+<div class="card">
+    <h3>Konfigurasi Acara</h3>
+    <form id="event-form">
+        <input id="mempelai" placeholder="Nama Mempelai" required>
+        <input id="hajat" placeholder="Nama Tuan Rumah" required>
+        <input id="alamat-acara" placeholder="Lokasi Acara" required>
+        <div style="display: flex; gap: 10px;">
+            <select id="acara-select" style="flex: 2;">
+                <option value="Pernikahan">Pernikahan</option>
+                <option value="Khitanan">Khitanan</option>
+                <option value="Tasyakuran">Tasyakuran</option>
+            </select>
+            <input id="target-undangan" type="number" placeholder="Target Undangan" required style="flex: 1;" value="500">
+        </div>
+        <button class="btn-main" type="submit">Update Info</button>
+    </form>
+</div>
+    </aside>
+
+<section class="content">
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; font-size: 0.75rem;">
+            <span>Progress Kehadiran</span>
+            <span id="progress-text">0/500 Tamu</span>
+        </div>
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+    </div>
+
+    <div class="card">
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 0.75rem;">
+            <div><small>Acara:</small><div id="disp-acara" style="font-weight:bold"> - </div></div>
+            <div><small>Mempelai:</small><div id="disp-mempelai" style="font-weight:bold"> - </div></div>
+            <div><small>Tuan Rumah:</small><div id="disp-hajat" style="font-weight:bold"> - </div></div>
+            <div><small>Lokasi:</small><div id="disp-alamat" style="font-weight:bold"> - </div></div>
+        </div>
+    </div>
+
+    <div id="list-tamu-container">
+        <div class="tabs">
+            <button class="tab-btn btn-semua active" onclick="switchTab('semua')">Semua</button>
+            <button class="tab-btn btn-pria" onclick="switchTab('Pria')">Pria</button>
+            <button class="tab-btn btn-wanita" onclick="switchTab('Wanita')">Wanita</button>
+        </div>
+
+        <div class="card" style="border-top: none; border-top-left-radius: 0; margin-top: -1px;">
+            <input id="searchBox" placeholder="🔍 Cari nama atau alamat..." style="margin-bottom: 15px;">
+            
+<div class="table-container">
+    <table id="guest-table">
+<thead>
+<tr>
+<th style="width:40px;text-align:center;">No</th>
+<th>Nama</th>
+<th>Alamat</th>
+<th style="width:90px;">Gender</th>
+<th style="width:120px;">Jumlah</th>
+<th>Keterangan</th>
+<th style="width:120px;text-align:center;">Aksi</th>
+</tr>
+</thead>
+<tbody id="guest-tbody"></tbody>
+</table>
+</div>
+
+<!-- PAGINATION -->
+<div id="pagination" style="text-align:center;margin-top:12px;">
+<button onclick="prevPage()">Prev</button>
+<span id="page-info">Page 1</span>
+<button onclick="nextPage()">Next</button>
+</div>
+
+</div>
+</div>
+</section>
+</main>
+
+<nav class="floating-nav">
+
+<button class="nav-item active" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+<i>🏠</i><span>Home</span>
+</button>
+
+<button class="nav-item" onclick="openAddModal()">
+<i>➕</i><span>Tambah</span>
+</button>
+
+<button class="nav-item" onclick="exportExcel()">
+<i>📤</i><span>Excel</span>
+</button>
+
+<button class="nav-item" onclick="printReport()">
+<i>🖨</i><span>Cetak</span>
+</button>
+
+<button class="nav-item" onclick="openBackupMenu()">
+<i>💾</i><span>Backup/Restore</span>
+</button>
+
+<button class="nav-item" onclick="clearAllData()">
+<i>🗑</i><span>Reset</span>
+</button>
+
+<button class="nav-item" onclick="toggleTheme()">
+<i>🌓</i><span>Mode</span>
+</button>
+
+<button class="nav-item" onclick="previewTable()">
+<i>📊</i><span>Preview</span>
+</button>
+
+</nav>
+
+<div id="addModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index:3000; padding:20px; align-items:center; justify-content:center;">
+    <div class="card" style="width:100%; max-width:400px; margin-bottom:0; box-shadow: 0 20px 40px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin-bottom:0; color: var(--primary);">📝 Input Tamu Baru</h3>
+            <button type="button" onclick="closeAddModal()" style="background:none; border:none; color:var(--danger); font-size:1.5rem; cursor:pointer; padding:0 5px;">&times;</button>
+        </div>
+
+        <form id="guest-form">
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold;">Nama Lengkap</label>
+                <input id="tamu-nama" placeholder="Contoh: Darya Jannadi" required style="margin-top: 5px;">
+            </div>
+
+<div style="margin-bottom: 12px;">
+    <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold;">Alamat / Desa</label>
+    <input id="tamu-alamat" placeholder="Pilih atau ketik desa..." list="list-desa" required style="margin-top: 5px;">
+    <datalist id="list-desa">
+        <option value="Bulurejo">
+        <option value="Kaliuling">
+        <option value="Pundungsari">
+        <option value="Purorejo">
+        <option value="Tegalrejo">
+        <option value="Tempurejo">
+        <option value="Tempursari">
+        <option value="Kulontalang">
+        <option value="Pasirejo / Wareng">
+        <option value="Umbulsari">
+        <option value="Umbulrejo">
+        <option value="Kalikowang">
+        <option value="Kandangan">
+        <option value="Sukosari">
+        <option value="Kampung Baru">
+        <option value="Kalisat">
+    </datalist>
+</div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold;">Gender</label>
+                    <select id="tamu-gender" style="margin-top: 5px;">
+                        <option value="Pria">Pria</option>
+                        <option value="Wanita">Wanita</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold;">Nominal (Rp)</label>
+                    <input id="tamu-jumlah" type="number" inputmode="numeric" placeholder="0" required style="margin-top: 5px; font-weight: bold; color: var(--success);">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold;">Keterangan</label>
+                <input id="tamu-keterangan" placeholder="Contoh: Teman Kerja (opsional)" style="margin-top: 5px;">
+            </div>
+
+            <button class="btn-main" type="submit" style="height: 50px; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span>💾 Simpan Data</span>
+            </button>
+            
+            <button type="button" onclick="closeAddModal()" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:15px; font-size: 0.8rem; cursor:pointer;">Nanti Saja</button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<script>
+
+function startClock() {
+    const clockTime = document.getElementById('clock-time');
+    const clockDate = document.getElementById('clock-date');
+    const days = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
+
+    function update() {
+        const now = new Date();
+        
+        // Jam
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        clockTime.innerText = `${h}:${m}:${s}`;
+
+        // Tanggal
+        const dayName = days[now.getDay()];
+        const d = String(now.getDate()).padStart(2, '0');
+        const mo = String(now.getMonth() + 1).padStart(2, '0');
+        const y = now.getFullYear();
+        clockDate.innerText = `${dayName} - ${d} | ${mo} | ${y}`;
+    }
+
+    setInterval(update, 1000);
+    update();
+}
+
+// Jalankan fungsi saat halaman dimuat
+document.addEventListener('DOMContentLoaded', startClock);
+
+
+    // 1. Inisialisasi Data (Ambil dari memori browser)
+    let eventData = JSON.parse(localStorage.getItem('dejedeEvent')) || { acara: 'Pernikahan', mempelai: '', hajat: '', alamat: '' };
+    let guestsData = JSON.parse(localStorage.getItem('dejedeGuests')) || [];
+    let targetUndangan = parseInt(localStorage.getItem('dejedeTarget')) || 500; // Ambil target dari memori
+    let currentTab = 'semua';
+    let myChart;
+	let editingGuestId = null; // <-- tambahkan di sini
+    // PAGINATION SYSTEM
+let currentPage = 1;
+let rowsPerPage = 100;
+	
+	// 2. Jalankan saat aplikasi dibuka
+    document.addEventListener('DOMContentLoaded', () => {
+        loadEventInfo();
+        renderAll();
+        initSearch();
+        initAutoUpdate(); // Jalankan pendengar otomatis
+    });
+
+    // 3. Fungsi Load & Sinkronisasi Info Acara
+    function loadEventInfo() {
+        // Ambil nilai dari memori sebagai prioritas utama
+        const teksAcara = eventData.acara || "Pernikahan";
+        const namaMempelai = eventData.mempelai || "...";
+        const namaHajat = eventData.hajat || "...";
+        const lokasi = eventData.alamat || "...";
+
+        // Update tampilan display card (kotak kecil)
+        if(document.getElementById('disp-acara')) document.getElementById('disp-acara').innerText = teksAcara;
+        if(document.getElementById('disp-mempelai')) document.getElementById('disp-mempelai').innerText = namaMempelai;
+        if(document.getElementById('disp-hajat')) document.getElementById('disp-hajat').innerText = namaHajat;
+        if(document.getElementById('disp-alamat')) document.getElementById('disp-alamat').innerText = lokasi;
+
+        // Update nilai di dalam form agar tidak kosong saat refresh
+        if(document.getElementById('mempelai')) document.getElementById('mempelai').value = eventData.mempelai || "";
+        if(document.getElementById('hajat')) document.getElementById('hajat').value = eventData.hajat || "";
+        if(document.getElementById('alamat-acara')) document.getElementById('alamat-acara').value = eventData.alamat || "";
+        if(document.getElementById('target-undangan')) document.getElementById('target-undangan').value = targetUndangan;
+        if(document.getElementById('acara-select')) document.getElementById('acara-select').value = teksAcara;
+
+        // Update Running Text Utama
+        const kalimatLengkap = `🌸 Selamat datang di acara ${teksAcara} <b>${namaMempelai}</b> - Terimakasih telah hadir untuk memberikan do'a restu atas hajat Bapak/Ibu <b>${namaHajat}</b> yang beralamat di ${lokasi}. Semoga kebaikan Bapak/Ibu dibalas oleh Tuhan Yang Maha Esa.`;
+        const jeda = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+        const containerTeks = document.getElementById('running-text-1');
+        if (containerTeks) {
+            containerTeks.innerHTML = `<span>${kalimatLengkap}${jeda}</span><span>${kalimatLengkap}${jeda}</span>`;
+        }
+    }
+
+    // 4. Pendengar Otomatis (Real-time Update)
+    function initAutoUpdate() {
+        // Pantau input info acara
+        const eventInputs = ['mempelai', 'hajat', 'alamat-acara', 'acara-select', 'target-undangan'];
+        eventInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.addEventListener('input', (e) => {
+                    if(id === 'target-undangan') {
+                        targetUndangan = parseInt(e.target.value) || 0;
+                        localStorage.setItem('dejedeTarget', targetUndangan);
+                        updateProgress(); 
+                    } else {
+                        // Menyesuaikan mapping ID input ke properti eventData
+                        const key = id === 'acara-select' ? 'acara' : id.replace('-acara', '');
+                        eventData[key] = e.target.value;
+                        localStorage.setItem('dejedeEvent', JSON.stringify(eventData));
+                        loadEventInfo(); // Langsung update UI dan running text
+                    }
+                });
+            }
+        });
+    }
+
+    // 5. Progress Kehadiran (Fix Bug / 500)
+    function updateProgress() {
+        const totalTamu = guestsData.length;
+        const target = targetUndangan || 500;
+        const percent = Math.min((totalTamu / target) * 100, 100).toFixed(1);
+        
+        const fill = document.getElementById('progress-fill');
+        const text = document.getElementById('progress-text');
+        
+        if (fill) fill.style.width = percent + '%';
+        if (text) text.innerText = `${totalTamu} / ${target} Tamu (${percent}%)`;
+    }
+
+    // 6. Guest Logic (Tambah Tamu)
+document.getElementById('guest-form').onsubmit = (e) => {
+
+    e.preventDefault();
+
+    const guestData = {
+        id: editingGuestId || Date.now(),
+        nama: document.getElementById('tamu-nama').value,
+        alamat: document.getElementById('tamu-alamat').value,
+        gender: document.getElementById('tamu-gender').value,
+        jumlah: parseInt(document.getElementById('tamu-jumlah').value) || 0,
+        keterangan: document.getElementById('tamu-keterangan').value
+    };
+
+    if(editingGuestId) {
+
+        const index = guestsData.findIndex(g => g.id === editingGuestId);
+        guestsData[index] = guestData;
+        editingGuestId = null;
+
+    } else {
+
+        guestsData.push(guestData);
+
+    }
+
+    localStorage.setItem('dejedeGuests', JSON.stringify(guestsData));
+
+    renderAll();
+    closeAddModal();
+
+    e.target.reset();
+
+};
+
+    function deleteGuest(id) {
+        if(confirm('Hapus data ini?')) {
+            guestsData = guestsData.filter(g => g.id !== id);
+            localStorage.setItem('dejedeGuests', JSON.stringify(guestsData));
+            renderAll();
+        }
+    }
+function editGuest(id) {
+
+    const guest = guestsData.find(g => g.id === id);
+    if(!guest) return;
+
+    editingGuestId = id;
+
+    document.getElementById('tamu-nama').value = guest.nama;
+    document.getElementById('tamu-alamat').value = guest.alamat;
+    document.getElementById('tamu-gender').value = guest.gender;
+    document.getElementById('tamu-jumlah').value = guest.jumlah;
+    document.getElementById('tamu-keterangan').value = guest.keterangan || "";
+
+    openAddModal();
+}
+    // 7. Rendering & Stats
+    function renderAll() {
+        renderTable();
+        updateStats();
+        updateChart();
+        updateRanking();
+        updateProgress();
+    }
+
+function renderTable(){
+    const tbody = document.getElementById('guest-tbody');
+    if(!tbody) return;
+
+    let filtered = currentTab === 'semua'
+        ? guestsData
+        : guestsData.filter(g => g.gender === currentTab);
+
+    const searchVal = document.getElementById('searchBox')?.value.toLowerCase() || '';
+
+    if(searchVal){
+        filtered = filtered.filter(g =>
+            g.nama.toLowerCase().includes(searchVal) ||
+            g.alamat.toLowerCase().includes(searchVal) ||
+            (g.keterangan && g.keterangan.toLowerCase().includes(searchVal))
+        );
+    }
+
+    const start = (currentPage-1) * rowsPerPage;
+    const end = start + rowsPerPage;
+    const pageData = filtered.slice(start,end);
+
+    let html = "";
+    pageData.forEach((g,i)=>{
+        html += `
+        <tr>
+            <td style="text-align:center">${start+i+1}</td>
+            <td><strong>${g.nama}</strong></td>
+            <td>${g.alamat}</td>
+            <td style="text-align:center">${g.gender}</td>
+            <td style="color:#6BCB77;font-weight:bold;">${formatIDR(g.jumlah)}</td>
+            <td>${g.keterangan||"-"}</td>
+            <td style="text-align:center; display: flex; gap: 5px; justify-content: center;">
+                <button class="btn-edit" onclick="editGuest(${g.id})">Edit</button>
+                <button class="btn-delete" onclick="deleteGuest(${g.id})">Delete</button>
+            </td>
+        </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    updatePagination(filtered.length);
+}
+
+function formatIDR(angka) {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }).format(angka);
+}
+
+
+// =============================
+// PAGINATION
+// =============================
+
+function nextPage(){
+currentPage++;
+renderTable();
+}
+
+function prevPage(){
+if(currentPage > 1){
+currentPage--;
+renderTable();
+}
+}
+
+function updatePagination(total){
+
+const totalPages = Math.ceil(total / rowsPerPage);
+
+document.getElementById("page-info").innerText =
+`Page ${currentPage} / ${totalPages}`;
+
+}
+
+
+    function updateStats() {
+        const totalUang = guestsData.reduce((sum, g) => sum + g.jumlah, 0);
+        document.getElementById('stat-tamu').innerText = guestsData.length;
+        document.getElementById('stat-uang').innerText = formatIDR(totalUang);
+        document.getElementById('stat-avg').innerText = formatIDR(totalUang / (guestsData.length || 1));
+        document.getElementById('stat-last').innerText = guestsData.length ? guestsData[guestsData.length-1].nama.split(' ')[0] : '-';
+    }
+
+    function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (tab === 'semua' && btn.classList.contains('btn-semua')) btn.classList.add('active');
+            if (tab === 'Pria' && btn.classList.contains('btn-pria')) btn.classList.add('active');
+            if (tab === 'Wanita' && btn.classList.contains('btn-wanita')) btn.classList.add('active');
+        });
+        renderTable();
+    }
+
+    function initSearch() {
+        const sBox = document.getElementById('searchBox');
+        if(sBox) {
+            sBox.oninput = () => renderTable();
+        }
+    }
+
+    function updateChart() {
+        const ctx = document.getElementById('moneyChart')?.getContext('2d');
+        if(!ctx) return;
+        if(myChart) myChart.destroy();
+        const last10 = guestsData.slice(-10);
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: last10.map(g => g.nama.split(' ')[0]),
+                datasets: [{ label: 'Amplop', data: last10.map(g => g.jumlah), borderColor: '#8CA98B', tension: 0.4, fill: true, backgroundColor: 'rgba(140, 169, 139, 0.1)' }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { display: false } } }
+        });
+    }
+
+    function updateRanking() {
+        const top = [...guestsData].sort((a,b) => b.jumlah - a.jumlah).slice(0, 5);
+        document.getElementById('top-donors').innerHTML = top.map(g => `
+            <li style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                <span>${g.nama}</span><strong>${formatIDR(g.jumlah)}</strong>
+            </li>
+        `).join('');
+    }
+
+    // Helpers
+    function formatIDR(num) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num); }
+    function toggleTheme() { document.body.classList.toggle('light'); }
+    function openAddModal() { document.getElementById('addModal').style.display = 'flex'; }
+	function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+    editingGuestId = null;
+}
+    function exportExcel() {
+        const ws = XLSX.utils.json_to_sheet(guestsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Tamu");
+        XLSX.writeFile(wb, "Data_Tamu_DEJEDE.xlsx");
+    }
+    function printReport() { window.print(); }
+	
+	
+// =============================
+// AUTO BACKUP SYSTEM
+// =============================
+
+function backupData() {
+
+    const backup = {
+        event: eventData,
+        guests: guestsData,
+        target: targetUndangan,
+        timestamp: new Date().toISOString()
+    };
+
+    localStorage.setItem('dejedeBackup', JSON.stringify(backup));
+
+}
+
+setInterval(() => {
+
+    backupData();
+
+}, 30000); // setiap 30 detik
+
+// =============================
+// AUTO RESTORE
+// =============================
+
+const backup = JSON.parse(localStorage.getItem('dejedeBackup'));
+
+if (backup && guestsData.length === 0 && backup.guests.length > 0) {
+
+    if(confirm("Backup data ditemukan. Restore data?")) {
+
+        guestsData = backup.guests;
+        eventData = backup.event;
+        targetUndangan = backup.target;
+
+        localStorage.setItem('dejedeGuests', JSON.stringify(guestsData));
+        localStorage.setItem('dejedeEvent', JSON.stringify(eventData));
+        localStorage.setItem('dejedeTarget', targetUndangan);
+
+    }
+
+}
+
+
+function downloadBackup() {
+
+    const data = {
+
+        event: eventData,
+        guests: guestsData,
+        target: targetUndangan,
+        time: new Date().toLocaleString()
+
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+
+    a.href = url;
+    a.download = "backup_dejede.json";
+
+    a.click();
+
+}
+
+setInterval(() => {
+
+    downloadBackup();
+
+}, 300000); // 5 menit
+
+function restoreBackup(){
+
+    const input = document.createElement('input');
+    input.type = "file";
+    input.accept = ".json";
+
+    input.onchange = e => {
+
+        const file = e.target.files[0];
+
+        const reader = new FileReader();
+
+        reader.onload = function(){
+
+            const data = JSON.parse(reader.result);
+
+            guestsData = data.guests || [];
+            eventData = data.event || {};
+            targetUndangan = data.target || 500;
+
+            localStorage.setItem('dejedeGuests', JSON.stringify(guestsData));
+            localStorage.setItem('dejedeEvent', JSON.stringify(eventData));
+            localStorage.setItem('dejedeTarget', targetUndangan);
+
+            alert("Backup berhasil dipulihkan");
+
+            location.reload();
+
+        };
+
+        reader.readAsText(file);
+
+    };
+
+    input.click();
+
+}
+
+function openBackupMenu(){
+
+    const pilih = prompt(
+`MENU BACKUP
+
+1 = Download Backup
+2 = Restore Backup
+
+Masukkan angka:`);
+
+    if(pilih == "1"){
+
+        downloadBackup();
+
+    }
+
+    if(pilih == "2"){
+
+        restoreBackup();
+
+    }
+
+}
+
+function previewTable(){
+
+// ambil data sesuai tab aktif
+let dataPreview = currentTab === 'semua'
+? guestsData
+: guestsData.filter(g => g.gender === currentTab);
+
+let html = `
+<html>
+<head>
+<title>Preview Buku Tamu</title>
+
+<style>
+
+@page{
+size:A4;
+margin:12mm;
+}
+
+body{
+font-family:Arial, Helvetica, sans-serif;
+color:#000;
+margin:0;
+}
+
+.topbar{
+display:flex;
+justify-content:space-between;
+font-size:12px;
+margin-bottom:6px;
+}
+
+.preview-title{
+text-align:center;
+font-size:16px;
+font-weight:bold;
+margin-bottom:8px;
+}
+
+.toolbar{
+text-align:right;
+margin-bottom:6px;
+}
+
+.toolbar button{
+padding:4px 10px;
+margin-left:5px;
+border:none;
+background:#444;
+color:white;
+border-radius:4px;
+cursor:pointer;
+font-size:12px;
+}
+
+.header{
+display:flex;
+align-items:center;
+border-bottom:2px solid #000;
+padding-bottom:6px;
+margin-bottom:8px;
+}
+
+.logo{
+width:50px;
+margin-right:12px;
+}
+
+.title{
+font-size:18px;
+font-weight:bold;
+}
+
+.subtitle{
+font-size:12px;
+}
+
+.event{
+margin-top:6px;
+margin-bottom:10px;
+font-size:13px;
+line-height:1.4;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+font-size:12px;
+}
+
+th,td{
+border:1px solid #000;
+padding:5px;
+}
+
+th{
+background:#f2f2f2;
+text-align:center;
+}
+
+.total{
+font-weight:bold;
+background:#f5f5f5;
+}
+
+.footer{
+margin-top:10px;
+font-size:11px;
+text-align:right;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="toolbar">
+<button onclick="window.print()">🖨 Cetak</button>
+<button onclick="window.print()">💾 Save PDF</button>
+</div>
+
+<div class="header">
+
+<img class="logo" src="images/logo.png">
+
+<div>
+<div class="title">DEJEDE Buku Tamu</div>
+<div class="subtitle">085236578999 | Photography & Videography</div>
+</div>
+
+</div>
+
+<div class="event">
+
+<b>Acara:</b> ${eventData.acara}<br>
+<b>Mempelai:</b> ${eventData.mempelai}<br>
+<b>Tuan Rumah:</b> ${eventData.hajat}<br>
+<b>Lokasi:</b> ${eventData.alamat}<br>
+<b>Filter:</b> ${currentTab}
+
+</div>
+
+<table>
+
+<tr>
+<th width="40">No</th>
+<th>Nama</th>
+<th>Alamat</th>
+<th width="90">Gender</th>
+<th width="120">Jumlah</th>
+<th>Keterangan</th>
+</tr>
+`;
+
+let total = 0;
+
+dataPreview.forEach((g,i)=>{
+
+total += g.jumlah;
+
+html += `
+<tr>
+<td align="center">${i+1}</td>
+<td>${g.nama}</td>
+<td>${g.alamat}</td>
+<td align="center">${g.gender}</td>
+<td align="right">${formatIDR(g.jumlah)}</td>
+<td>${g.keterangan || "-"}</td>
+</tr>
+`;
+
+});
+
+html += `
+<tr class="total">
+<td colspan="4" align="right">TOTAL</td>
+<td colspan="2">${formatIDR(total)}</td>
+</tr>
+`;
+
+html += `
+</table>
+
+<div class="footer">
+Dicetak dari sistem DEJEDE
+</div>
+
+</body>
+</html>
+`;
+
+const win = window.open("", "_blank");
+
+win.document.write(html);
+
+win.document.close();
+
+}
+
+// =============================
+// RESET ALL DATA
+// =============================
+
+function clearAllData(){
+
+const step1 = confirm(
+`PERINGATAN ⚠️
+
+Semua data tamu akan dihapus!
+
+Apakah Anda yakin?`
+);
+
+if(!step1) return;
+
+const step2 = confirm(
+`Konfirmasi terakhir!
+
+Data buku tamu akan dihapus permanen.
+
+Lanjutkan?`
+);
+
+if(!step2) return;
+
+// hapus data
+localStorage.removeItem('dejedeGuests');
+localStorage.removeItem('dejedeEvent');
+localStorage.removeItem('dejedeTarget');
+localStorage.removeItem('dejedeBackup');
+
+// reset variable
+guestsData = [];
+eventData = {};
+targetUndangan = 500;
+
+// refresh tampilan
+renderAll();
+
+alert("Data berhasil dihapus");
+
+location.reload();
+
+}
+
+</script>
+</body>
+</html>
