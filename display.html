@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEJEDE Display Monitor</title>
+<style>
+:root{--bg:#eef3ef;--card:#f7faf7;--primary:#8ca98b;--text:#2e3f35;--muted:#7a8f84;--border:#d8e2dc;--on:#fff}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Inter','Segoe UI',Tahoma,sans-serif}
+html{font-size:clamp(12px,1.05vw,28px)}
+body{height:100vh;overflow:hidden;background:radial-gradient(circle at 15% 10%,color-mix(in srgb,var(--primary) 22%,var(--bg)),var(--bg) 60%);color:var(--text);display:flex;flex-direction:column;padding:1.2rem 1.6rem .8rem;gap:1rem}
+body.idle{cursor:none}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.brand{display:flex;align-items:center;gap:.8rem}
+.brand img{height:3rem;border-radius:.5rem}
+.brand b{display:block;font-size:1.5rem;letter-spacing:.5px;color:var(--primary)}
+.brand small{color:var(--muted);font-size:.8rem}
+.clock{text-align:right}
+#time{font-size:2.6rem;font-weight:800;line-height:1}
+#date{font-size:.8rem;letter-spacing:2px;font-weight:700;color:var(--primary);margin-top:.2rem}
+.hero{text-align:center;padding:.4rem 0}
+.hero .kicker{font-size:1rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.hero h1{font-size:3.2rem;font-weight:800;line-height:1.15;margin:.3rem 0;color:var(--text)}
+.hero h1 span{color:var(--primary)}
+.hero p{font-size:1.15rem;color:var(--muted)}
+.hero p b{color:var(--text)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+.stat{background:var(--card);border:1px solid var(--border);border-left:.35rem solid var(--c);border-radius:1rem;padding:.9rem 1.2rem;box-shadow:0 4px 18px rgba(0,0,0,.08)}
+.stat span{font-size:.8rem;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.stat strong{display:block;font-size:2.4rem;font-weight:800;color:var(--c);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog{background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:.7rem 1.2rem}
+.prog .bar{height:.8rem;border-radius:99px;background:color-mix(in srgb,var(--primary) 15%,transparent);overflow:hidden}
+.prog .fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,color-mix(in srgb,var(--primary) 70%,#000),var(--primary));transition:width 1s ease}
+.prog p{font-size:.85rem;font-weight:700;margin-top:.35rem;color:var(--muted);text-align:center}
+.main{flex:1;min-height:0;display:grid;grid-template-columns:1.6fr 1fr;gap:1rem}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:1rem 1.3rem;box-shadow:0 4px 18px rgba(0,0,0,.08);display:flex;flex-direction:column;min-height:0}
+.panel h3{font-size:1.1rem;margin-bottom:.6rem}
+.chartbox{flex:1;min-height:0;position:relative}
+#top{list-style:none;flex:1;display:flex;flex-direction:column;justify-content:space-around}
+#top li{display:flex;align-items:center;gap:.7rem;font-size:1.25rem;padding:.35rem 0;border-bottom:1px solid var(--border)}
+#top li:last-child{border:none}
+#top .rk{width:2rem;text-align:center}
+#top .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#top strong{color:var(--primary)}
+.ticker{overflow:hidden;white-space:nowrap;background:var(--primary);color:var(--on);border-radius:99px;padding:.45rem 0;font-size:1rem;font-weight:600}
+.ticker div{display:inline-block;padding-left:100%;animation:run 40s linear infinite}
+@keyframes run{to{transform:translateX(-100%)}}
+#welcome{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);z-index:50}
+#welcome.show{display:flex}
+#welcome div{background:var(--card);border:2px solid var(--primary);border-radius:1.5rem;padding:2.5rem 4rem;text-align:center;animation:pop .5s ease;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+#welcome small{font-size:1.1rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+#welcome h2{font-size:4rem;color:var(--primary);margin:.4rem 0}
+#welcome p{font-size:1.3rem;color:var(--muted)}
+@keyframes pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+#fs{position:fixed;right:1rem;bottom:3.4rem;border:none;background:var(--primary);color:var(--on);padding:.5rem .9rem;border-radius:99px;font-weight:700;font-size:.8rem;cursor:pointer;opacity:.85;transition:opacity .5s;z-index:60}
+body.idle #fs{opacity:0}
+@media(max-width:900px){html{font-size:13px}.stats{grid-template-columns:1fr 1fr}.main{grid-template-columns:1fr}body{overflow:auto;height:auto;min-height:100vh}.hero h1{font-size:2rem}.chartbox{height:220px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><img src="images/logo.png" alt="" onerror="this.style.display='none'"><div><b>DEJEDE GUESSBOOK</b><small>Buku Tamu &amp; Manajemen Amplop</small></div></div>
+  <div class="clock"><div id="time">00:00:00</div><div id="date"></div></div>
+</header>
+
+<section class="hero">
+  <div class="kicker" id="h-kicker">Selamat Datang</div>
+  <h1 id="h-title">...</h1>
+  <p id="h-sub"></p>
+</section>
+
+<section class="stats">
+  <div class="stat" style="--c:#42a5f5"><span>Tamu</span><strong id="s-tamu">0</strong></div>
+  <div class="stat" style="--c:#ef5350"><span>Total</span><strong id="s-uang">Rp 0</strong></div>
+  <div class="stat" style="--c:#fbc02d"><span>Rata-rata</span><strong id="s-avg">Rp 0</strong></div>
+  <div class="stat" style="--c:#ec6fd1"><span>Terakhir</span><strong id="s-last">-</strong></div>
+</section>
+
+<section class="prog"><div class="bar"><div class="fill" id="fill"></div></div><p id="ptext"></p></section>
+
+<section class="main">
+  <div class="panel"><h3>Trend Pemasukan</h3><div class="chartbox"><canvas id="chart"></canvas></div></div>
+  <div class="panel"><h3>🏆 Top 5 Penyumbang</h3><ul id="top"></ul></div>
+</section>
+
+<div class="ticker"><div id="ticker-txt"></div></div>
+<div id="welcome"><div><small>Selamat Datang</small><h2 id="w-name"></h2><p id="w-sub">Terima kasih atas kehadiran dan doa restunya 🙏</p></div></div>
+<button id="fs" onclick="toggleFS()">⛶ Layar Penuh (F)</button>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const idr = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
+const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } };
+
+// Tema mengikuti Buku Tamu (bg, card, primary, text)
+const WARNA = {'sage':['#eef3ef','#f7faf7','#8ca98b','#2e3f35'],'sage-dark':['#121212','#1e1e1e','#8ca98b','#e8e8e8'],'macos':['#f2f2f7','#ffffff','#007aff','#1d1d1f'],'macos-dark':['#000000','#1c1c1e','#0a84ff','#f5f5f7'],'kde':['#eff0f1','#fcfcfc','#3daee9','#232629'],'kde-dark':['#1b1e20','#31363b','#3daee9','#eff0f1'],'win11':['#f3f3f3','#fbfbfb','#0067c0','#1a1a1a'],'ubuntu':['#2b0a22','#3c1232','#e95420','#f2f2f2'],'nord':['#2e3440','#3b4252','#88c0d0','#eceff4'],'dracula':['#282a36','#343746','#bd93f9','#f8f8f2']};
+function applyTheme() {
+  const t = WARNA[localStorage.getItem('dejede-theme')] || WARNA.sage, r = document.documentElement.style;
+  const dark = parseInt(t[0].slice(1,3),16) < 110;
+  r.setProperty('--bg',t[0]); r.setProperty('--card',t[1]); r.setProperty('--primary',t[2]); r.setProperty('--text',t[3]);
+  r.setProperty('--border',dark?'#ffffff22':'#00000018'); r.setProperty('--muted',dark?'#aab':'#667');
+  r.setProperty('--on',['#88c0d0','#bd93f9'].includes(t[2])?'#222':'#fff');
+  if (chart) { chart.data.datasets[0].borderColor = t[2]; chart.data.datasets[0].backgroundColor = t[2]+'22'; chart.options.scales.x.ticks.color = getComputedStyle(document.documentElement).getPropertyValue('--muted'); chart.update('none'); }
+}
+
+const LABEL = { Pernikahan:'Mempelai', Khitanan:'Anak', Tasyakuran:'Yang Disyukuri' };
+let chart = null, lastCount = null, shown = '';
+
+function render() {
+  const guests = read('dejedeGuests', []), ev = read('dejedeEvent', {acara:'Pernikahan',mempelai:'',hajat:'',alamat:''}), target = parseInt(localStorage.getItem('dejedeTarget')) || 0;
+  const total = guests.reduce((s,g) => s + (g.jumlah||0), 0), n = guests.length;
+  const sig = n + '|' + total + '|' + JSON.stringify(ev) + '|' + target + '|' + (guests[n-1] ? guests[n-1].id : '');
+  if (sig === shown) return; shown = sig;
+
+  $('h-kicker').innerText = 'Syukuran ' + (ev.acara || '');
+  $('h-title').innerHTML = ev.mempelai ? esc(LABEL[ev.acara] === 'Mempelai' ? '' : 'Ananda ') + '<span>' + esc(ev.mempelai) + '</span>' : '<span>—</span>';
+  $('h-sub').innerHTML = 'Kediaman Bapak/Ibu <b>' + esc(ev.hajat || '...') + '</b>' + (ev.alamat ? ' • ' + esc(ev.alamat) : '');
+  $('s-tamu').innerText = n;
+  $('s-uang').innerText = idr(total);
+  $('s-avg').innerText = idr(total / (n || 1));
+  $('s-last').innerText = n ? String(guests[n-1].nama).split(' ')[0] : '-';
+  const p = target > 0 ? Math.min(n / target * 100, 100).toFixed(1) : '0.0';
+  $('fill').style.width = p + '%';
+  $('ptext').innerText = target > 0 ? `${n} / ${target} Tamu (${p}%)` : 'Jumlah undangan belum diisi';
+  $('ticker-txt').innerText = `✨ Selamat Datang di Kediaman Bapak/Ibu ${ev.hajat || '...'} dalam Rangka Syukuran ${ev.acara || ''} ${ev.mempelai || ''} yang Berlokasi di ${ev.alamat || '...'} ✨   •   Terima kasih atas kehadiran dan doa restu Bapak/Ibu/Saudara/i   •   Abadikan Setiap Detik Berharga Bersama DEJEDE   `;
+
+  const medal = ['🥇','🥈','🥉','4','5'];
+  $('top').innerHTML = [...guests].sort((a,b) => b.jumlah - a.jumlah).slice(0,5).map((g,i) => `<li><span class="rk">${medal[i]}</span><span class="nm">${esc(g.nama)}</span><strong>${idr(g.jumlah)}</strong></li>`).join('') || '<li style="justify-content:center;color:var(--muted)">Belum ada data</li>';
+
+  const last10 = guests.slice(-10);
+  if (!chart) {
+    chart = new Chart($('chart'), { type:'line', data:{ labels:[], datasets:[{ data:[], tension:.4, fill:true, borderWidth:3, pointRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{display:false}, x:{grid:{display:false}, ticks:{font:{size:14}}} } } });
+    applyTheme();
+  }
+  chart.data.labels = last10.map(g => String(g.nama).split(' ')[0]);
+  chart.data.datasets[0].data = last10.map(g => g.jumlah);
+  chart.update();
+
+  // Sambutan untuk tamu baru
+  if (lastCount !== null && n > lastCount && guests[n-1]) {
+    $('w-name').innerText = guests[n-1].nama;
+    $('w-sub').innerText = (guests[n-1].alamat ? guests[n-1].alamat + ' • ' : '') + 'Terima kasih atas kehadiran dan doa restunya 🙏';
+    $('welcome').classList.add('show'); clearTimeout(window._w); window._w = setTimeout(() => $('welcome').classList.remove('show'), 4500);
+  }
+  lastCount = n;
+}
+
+function tick() {
+  const d = new Date();
+  $('time').innerText = d.toLocaleTimeString('id-ID',{hour12:false}).replace(/\./g,'.');
+  $('date').innerText = d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+}
+function toggleFS() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+document.addEventListener('keydown', e => { if (e.key.toLowerCase() === 'f') toggleFS(); });
+document.addEventListener('dblclick', toggleFS);
+let idleT; const wake = () => { document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => document.body.classList.add('idle'), 3000); };
+['mousemove','keydown','click'].forEach(ev => document.addEventListener(ev, wake)); wake();
+
+window.addEventListener('storage', e => { if (e.key === 'dejede-theme') applyTheme(); render(); }); // update langsung dari jendela Buku Tamu
+setInterval(render, 2000);  // cadangan
+setInterval(tick, 1000);
+applyTheme(); tick(); render();
+</script>
+</body>
+</html>
