@@ -1,1 +1,1205 @@
-(function () {'use strict';var LS_SET = 'dejedeSholat', LS_CACHE = 'dejedeSholatCache', LS_GPS = 'dejedeSholatGPS', LS_FIRED = 'dejedeSholatFired';var ZONES = {WIB: {lbl: 'WIB', off: 7, tz: 'Asia/Jakarta', city: 'Jakarta'}, WITA: {lbl: 'WITA', off: 8, tz: 'Asia/Makassar', city: 'Makassar'}, WIT: {lbl: 'WIT', off: 9, tz: 'Asia/Jayapura', city: 'Jayapura'}};var TZ_MAP = {'Asia/Jakarta': 'WIB', 'Asia/Pontianak': 'WIB', 'Asia/Makassar': 'WITA', 'Asia/Ujung_Pandang': 'WITA', 'Asia/Jayapura': 'WIT'};var CITIES = [ ['Banda Aceh', 5.5483, 95.3238, 'WIB'], ['Medan', 3.5952, 98.6722, 'WIB'], ['Padang', -0.9471, 100.4172, 'WIB'], ['Pekanbaru', 0.5071, 101.4478, 'WIB'], ['Batam', 1.0456, 104.0305, 'WIB'], ['Tanjung Pinang', 0.9186, 104.4558, 'WIB'], ['Jambi', -1.6101, 103.6131, 'WIB'], ['Palembang', -2.9761, 104.7754, 'WIB'], ['Pangkal Pinang', -2.1316, 106.1169, 'WIB'], ['Bengkulu', -3.8004, 102.2655, 'WIB'], ['Bandar Lampung', -5.45, 105.2667, 'WIB'], ['Serang', -6.12, 106.1503, 'WIB'], ['Jakarta', -6.2088, 106.8456, 'WIB'], ['Bandung', -6.9175, 107.6191, 'WIB'], ['Semarang', -6.9667, 110.4167, 'WIB'], ['Yogyakarta', -7.7956, 110.3695, 'WIB'], ['Surabaya', -7.2575, 112.7521, 'WIB'], ['Malang', -7.9839, 112.6214, 'WIB'], ['Banyuwangi', -8.2192, 114.3691, 'WIB'], ['Pontianak', -0.0263, 109.3425, 'WIB'], ['Palangka Raya', -2.2161, 113.9135, 'WIB'], ['Denpasar', -8.6705, 115.2126, 'WITA'], ['Mataram', -8.5833, 116.1167, 'WITA'], ['Kupang', -10.1772, 123.607, 'WITA'], ['Banjarmasin', -3.3194, 114.5908, 'WITA'], ['Balikpapan', -1.2654, 116.8312, 'WITA'], ['Samarinda', -0.5022, 117.1536, 'WITA'], ['Tarakan', 3.3, 117.6333, 'WITA'], ['Makassar', -5.1477, 119.4327, 'WITA'], ['Palu', -0.8917, 119.8707, 'WITA'], ['Mamuju', -2.6748, 118.8883, 'WITA'], ['Kendari', -3.9985, 122.5129, 'WITA'], ['Gorontalo', 0.5435, 123.0568, 'WITA'], ['Manado', 1.4748, 124.8421, 'WITA'], ['Ambon', -3.6954, 128.1814, 'WIT'], ['Ternate', 0.7833, 127.3667, 'WIT'], ['Manokwari', -0.8615, 134.062, 'WIT'], ['Sorong', -0.8762, 131.2558, 'WIT'], ['Jayapura', -2.5337, 140.7181, 'WIT'], ['Merauke', -8.4932, 140.4018, 'WIT'] ];var PRAYERS = [ {key: 'Fajr', nama: 'Sholat Subuh', wajib: true}, {key: 'Sunrise', nama: 'Terbit', wajib: false}, {key: 'Dhuhr', nama: 'Sholat Dzuhur', wajib: true}, {key: 'Asr', nama: 'Sholat Ashar', wajib: true}, {key: 'Maghrib', nama: 'Sholat Maghrib', wajib: true}, {key: 'Isha', nama: 'Sholat Isya', wajib: true} ];var S = loadSettings();var DATA = null;var tomorrowCache = null;var reqToken = 0;var modalOpen = false;var lastChip = '';var audioCtx = null;var alertTimer = null;var activeOsc = [];var alertAct = null;var activeMs = 0, lastRestTick = Date.now(), restTipIdx = 0;var restEnd = 0, restTimerId = null, restOpen = false, restStep = -1;var lastNotif = null;function pad(n) {return (n < 10 ? '0' : '') + n;} function $(id) {return document.getElementById(id);} function jget(k, def) {try {var v = JSON.parse(localStorage.getItem(k));return v == null ? def : v;} catch (e) {return def;}} function jset(k, v) {try {localStorage.setItem(k, JSON.stringify(v));} catch (e) {}} function loadSettings() {var d = {chip: true, mode: 'auto', city: 'Jakarta', remind: false, lead: 10, sound: true, rest: true, restEvery: 60};var s = jget(LS_SET, {});for (var k in s) if (s.hasOwnProperty(k)) d[k] = s[k];return d;} function saveSettings() {jset(LS_SET, S);} function cityByName(n) {for (var i = 0;i < CITIES.length;i++) if (CITIES[i][0] === n) return CITIES[i];return null;} function haversine(la1, lo1, la2, lo2) {var R = 6371, r = Math.PI / 180;var a = Math.pow(Math.sin((la2 - la1) * r / 2), 2) + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.pow(Math.sin((lo2 - lo1) * r / 2), 2);return 2 * R * Math.asin(Math.sqrt(a));} function nearestCity(lat, lon) {var best = null, bd = 1e9;CITIES.forEach(function (c) {var d = haversine(lat, lon, c[1], c[2]);if (d < bd) {bd = d;best = c;}});return {city: best, dist: bd};} function detectZone() {var tz = '';try {tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';} catch (e) {} if (TZ_MAP[tz]) return TZ_MAP[tz];var off = -new Date().getTimezoneOffset() / 60;if (off === 7) return 'WIB';if (off === 8) return 'WITA';if (off === 9) return 'WIT';return null;} function resolveLocation() {if (S.mode === 'manual') {var c = cityByName(S.city) || cityByName('Jakarta');return {name: c[0], lat: c[1], lon: c[2], zone: c[3], gps: false};} var dz = detectZone();var g = jget(LS_GPS, null);if (g && isFinite(g.lat) && isFinite(g.lon)) {var n = nearestCity(g.lat, g.lon);if (n.dist < 900) {return {name: 'Dekat ' + n.city[0], lat: g.lat, lon: g.lon, zone: dz || n.city[3], gps: true};}} var z = dz || 'WIB';var rc = cityByName(ZONES[z].city);return {name: rc[0] + ' (perkiraan)', lat: rc[1], lon: rc[2], zone: z, gps: false};} function requestGPS(manual) {var st = $('sh-gps-status');function say(t) {if (st) st.textContent = t;} if (!navigator.geolocation) {say('Perangkat tidak mendukung GPS. Pilih kota manual.');return;} if (manual) say('Mencari lokasi…');navigator.geolocation.getCurrentPosition(function (p) {jset(LS_GPS, {lat: +p.coords.latitude.toFixed(4), lon: +p.coords.longitude.toFixed(4), t: Date.now()});if (S.mode !== 'auto') {S.mode = 'auto';saveSettings();syncSettingsUI();} say('Lokasi terdeteksi ✓');refresh(true);}, function (e) {if (e && e.code === 1) say('Izin lokasi ditolak. Aktifkan izin lokasi atau pilih kota manual.');else if (!window.isSecureContext) say('GPS butuh HTTPS. Pilih kota manual.');else say('Lokasi tidak ditemukan. Coba lagi atau pilih kota manual.');}, {enableHighAccuracy: false, timeout: 12000, maximumAge: 3600000});} function silentGPS() {if (S.mode !== 'auto' || !navigator.geolocation) return;var g = jget(LS_GPS, null);if (g && Date.now() - g.t < 6 * 3600e3) return;try {if (navigator.permissions && navigator.permissions.query) {navigator.permissions.query({name: 'geolocation'}).then(function (r) {if (r.state === 'granted') requestGPS(false);}).catch(function () {});}} catch (e) {}} function todayInZone(zone) {var d = new Date(Date.now() + ZONES[zone].off * 3600e3);return [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()];} function sameYmd(a, b) {return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];} function instant(ymd, hhmm, off) {var p = hhmm.split(':');return Date.UTC(ymd[0], ymd[1] - 1, ymd[2], +p[0] - off, +p[1]);} var dtr = function (x) {return x * Math.PI / 180;}, rtd = function (x) {return x * 180 / Math.PI;}, sin = function (x) {return Math.sin(dtr(x));}, cos = function (x) {return Math.cos(dtr(x));}, tan = function (x) {return Math.tan(dtr(x));}, arcsin = function (x) {return rtd(Math.asin(x));}, arccos = function (x) {return rtd(Math.acos(x));}, arctan2 = function (y, x) {return rtd(Math.atan2(y, x));}, arccot = function (x) {return rtd(Math.atan(1 / x));}, fixAngle = function (a) {return a - 360 * Math.floor(a / 360);}, fixHour = function (a) {return a - 24 * Math.floor(a / 24);};function julian(y, m, d) {if (m <= 2) {y -= 1;m += 12;} var A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4);return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;} function sunPos(jd) {var D = jd - 2451545.0;var g = fixAngle(357.529 + 0.98560028 * D);var q = fixAngle(280.459 + 0.98564736 * D);var L = fixAngle(q + 1.915 * sin(g) + 0.020 * sin(2 * g));var e = 23.439 - 0.00000036 * D;var RA = arctan2(cos(e) * sin(L), cos(L)) / 15;return {decl: arcsin(sin(e) * sin(L)), eq: q / 15 - fixHour(RA)};} function calcTimes(y, m, d, lat, lon, off) {var jd = julian(y, m, d) - lon / 360;var RS = 0.833;function midDay(t) {return fixHour(12 - sunPos(jd + t).eq);} function angleTime(angle, t, ccw) {var decl = sunPos(jd + t).decl;var v = (-sin(angle) - sin(decl) * sin(lat)) / (cos(decl) * cos(lat));v = Math.max(-1, Math.min(1, v));var x = arccos(v) / 15;return midDay(t) + (ccw ? -x : x);} function asrTime(t) {var decl = sunPos(jd + t).decl;var ang = -arccot(1 + tan(Math.abs(lat - decl)));return angleTime(ang, t, false);} var T = {fajr: 5, sunrise: 6, dhuhr: 12, asr: 13, sunset: 18, isha: 18}, t = {}, k;for (k in T) t[k] = T[k] / 24;var r = {fajr: angleTime(20, t.fajr, true), sunrise: angleTime(RS, t.sunrise, true), dhuhr: midDay(t.dhuhr), asr: asrTime(t.asr), sunset: angleTime(RS, t.sunset, false), isha: angleTime(18, t.isha, false)};var adj = off - lon / 15;for (k in r) r[k] += adj;var IH = 2;function f(h, plus) {var mn = Math.round(h * 60 + plus);mn = ((mn % 1440) + 1440) % 1440;return pad(Math.floor(mn / 60)) + ':' + pad(mn % 60);} return {Fajr: f(r.fajr, IH), Sunrise: f(r.sunrise, -IH), Dhuhr: f(r.dhuhr, IH), Asr: f(r.asr, IH), Maghrib: f(r.sunset, IH), Isha: f(r.isha, IH)};} function fetchAladhan(loc, ymd) {var dd = pad(ymd[2]) + '-' + pad(ymd[1]) + '-' + ymd[0];var url = 'https://api.aladhan.com/v1/timings/' + dd + '?latitude=' + loc.lat + '&longitude=' + loc.lon + '&method=20&timezonestring=' + encodeURIComponent(ZONES[loc.zone].tz);var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;var to = setTimeout(function () {if (ctrl) ctrl.abort();}, 8000);return fetch(url, ctrl ? {signal: ctrl.signal} : {}).then(function (r) {clearTimeout(to);if (!r.ok) throw new Error('HTTP ' + r.status);return r.json();}).then(function (j) {var t = j && j.data && j.data.timings;if (!t) throw new Error('format');var out = {};PRAYERS.forEach(function (p) {var v = String(t[p.key] || '').trim().slice(0, 5);if (!/^\d{1,2}:\d{2}$/.test(v)) throw new Error('waktu ' + p.key);out[p.key] = v.length === 4 ? '0' + v : v;});return out;});} function cacheKey(loc, ymd) {return ymd.join('-') + '|' + loc.lat.toFixed(2) + ',' + loc.lon.toFixed(2) + '|' + loc.zone;} function refresh(force) {var loc = resolveLocation();var ymd = todayInZone(loc.zone);var key = cacheKey(loc, ymd);if (!force && DATA && DATA.key === key && !DATA.pending) {return;} var c = jget(LS_CACHE, null);if (!force && c && c.key === key && c.times && (c.src === 'api' || Date.now() - c.ts < 30 * 60e3)) {DATA = {key: key, loc: loc, ymd: ymd, times: c.times, src: c.src, pending: false};tomorrowCache = null;renderAll();return;} DATA = {key: key, loc: loc, ymd: ymd, pending: true, src: 'offline', times: calcTimes(ymd[0], ymd[1], ymd[2], loc.lat, loc.lon, ZONES[loc.zone].off)};tomorrowCache = null;renderAll();var my = ++reqToken;fetchAladhan(loc, ymd).then(function (times) {if (my !== reqToken) return;DATA = {key: key, loc: loc, ymd: ymd, times: times, src: 'api', pending: false};jset(LS_CACHE, {key: key, times: times, src: 'api', ts: Date.now()});renderAll();}).catch(function () {if (my !== reqToken) return;DATA.pending = false;jset(LS_CACHE, {key: key, times: DATA.times, src: 'offline', ts: Date.now()});renderAll();});} function instants() {var off = ZONES[DATA.loc.zone].off;var jumat = new Date(Date.UTC(DATA.ymd[0], DATA.ymd[1] - 1, DATA.ymd[2])).getUTCDay() === 5;return PRAYERS.map(function (p) {return {key: p.key, wajib: p.wajib, hhmm: DATA.times[p.key], nama: (jumat && p.key === 'Dhuhr') ? 'Sholat Jumat' : p.nama, jumat: jumat && p.key === 'Dhuhr', t: instant(DATA.ymd, DATA.times[p.key], off)};});} function nextPrayer(now) {var list = instants().filter(function (p) {return p.wajib;});for (var i = 0;i < list.length;i++) if (list[i].t > now) {list[i].besok = false;return list[i];} if (!tomorrowCache) {var off = ZONES[DATA.loc.zone].off;var dt = new Date(Date.UTC(DATA.ymd[0], DATA.ymd[1] - 1, DATA.ymd[2] + 1));var y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1, d = dt.getUTCDate();var tm = calcTimes(y, m, d, DATA.loc.lat, DATA.loc.lon, off);tomorrowCache = {key: 'Fajr', nama: 'Sholat Subuh', wajib: true, hhmm: tm.Fajr, t: instant([y, m, d], tm.Fajr, off), besok: true};} return tomorrowCache;} function fmtCount(ms) {var s = Math.max(0, Math.floor(ms / 1000));var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60;return pad(h) + ':' + pad(m) + ':' + pad(sc);} function fmtShort(ms) {var m = Math.max(0, Math.round(ms / 60000));var h = Math.floor(m / 60);return h > 0 ? h + 'j ' + (m % 60) + 'm' : m + ' mnt';} function getAudio() {try {if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();if (audioCtx.state === 'suspended') audioCtx.resume();} catch (e) {audioCtx = null;} return audioCtx;} function beep() {var ctx = getAudio();if (!ctx) return;var seq = [660, 880, 660, 880];seq.forEach(function (f, i) {var o = ctx.createOscillator(), g = ctx.createGain();var t0 = ctx.currentTime + i * 0.38;o.type = 'sine';o.frequency.value = f;g.gain.setValueAtTime(0.0001, t0);g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.04);g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.34);o.connect(g);g.connect(ctx.destination);o.start(t0);o.stop(t0 + 0.36);activeOsc.push(o);o.onended = function () {var i = activeOsc.indexOf(o);if (i > -1) activeOsc.splice(i, 1);};});} function showAlert(title, body, actLabel, actFn) {var a = $('sh-alert');if (!a) return;a.querySelector('b').textContent = title;a.querySelector('span').textContent = body;var act = $('sh-act');alertAct = actFn || null;act.style.display = actLabel ? '' : 'none';act.textContent = actLabel || '';a.classList.add('show');clearTimeout(alertTimer);alertTimer = setTimeout(function () {a.classList.remove('show');}, 90000);} function notify(title, body) {try {if (!('Notification' in window) || Notification.permission !== 'granted') return;lastNotif = new Notification(title, {body: body, icon: 'images/logo.png', tag: 'dejede-sholat'});} catch (e) {}} function stopAlert() {activeOsc.slice().forEach(function (o) {try {o.stop();} catch (e) {}});activeOsc = [];try {if (navigator.vibrate) navigator.vibrate(0);} catch (e) {} try {if (lastNotif) lastNotif.close();} catch (e) {} lastNotif = null;clearTimeout(alertTimer);var a = $('sh-alert');if (a) a.classList.remove('show');} function fire(title, body) {stopAlert();showAlert(title, body);if (typeof window.toast === 'function') window.toast('🕌 ' + title);notify(title, body);if (S.sound) beep();try {if (navigator.vibrate) navigator.vibrate([300, 150, 300]);} catch (e) {}} function checkReminders(now) {if (!S.remind || !DATA) return;var day = DATA.ymd.join('-');var f = jget(LS_FIRED, {});if (f.day !== day) f = {day: day, k: {}};var changed = false, zl = ZONES[DATA.loc.zone].lbl;instants().forEach(function (p) {if (!p.wajib) return;var kPre = p.key + '-pre', kAt = p.key + '-at';if (S.lead > 0 && !f.k[kPre] && now >= p.t - S.lead * 60000 && now < p.t) {f.k[kPre] = 1;changed = true;fire(p.nama + ' ' + S.lead + ' menit lagi', 'Pukul ' + p.hhmm + ' ' + zl + '. Selesaikan pekerjaan yang sedang berjalan, lalu bersiap menunaikan sholat.');} if (!f.k[kAt] && now >= p.t && now < p.t + 3 * 60000) {f.k[kAt] = 1;changed = true;fire('Waktu ' + p.nama + ' telah tiba', 'Pukul ' + p.hhmm + ' ' + zl + ' (' + DATA.loc.name + '). Istirahatkan pekerjaan sejenak untuk menunaikan sholat.' + (p.jumat ? ' Bagi yang menunaikan, bersegeralah menuju masjid.' : ''));}});if (changed) jset(LS_FIRED, f);} var REST_TIPS = [ 'Istirahatkan mata: lihat benda yang jauh selama 20 detik, lalu kedipkan mata perlahan.', 'Berdiri sebentar, putar bahu ke belakang 10 kali dan regangkan leher dengan pelan.', 'Regangkan kedua tangan ke atas, tarik napas dalam, lalu minum air putih.', 'Putar pergelangan tangan dan buka-kepal jari 10 kali agar tidak kaku.', 'Jalan kaki 2 menit atau lakukan senam kecil agar badan kembali segar.' ];var REST_STEPS = [ {e: '👀', t: 'Rehatkan mata', d: 'Lihat benda yang jauh (±6 meter) selama 20 detik, kedipkan mata perlahan 10 kali, lalu pejamkan sebentar.'}, {e: '🧘', t: 'Lemaskan leher', d: 'Tundukkan dan tengadahkan kepala pelan-pelan, miringkan ke kiri-kanan, lalu tengok kiri-kanan. Ulangi 5 kali.'}, {e: '💪', t: 'Bahu & punggung', d: 'Putar bahu ke belakang 10 kali, lalu angkat kedua tangan ke atas dan regangkan badan sambil menarik napas.'}, {e: '✋', t: 'Tangan & pergelangan', d: 'Putar pergelangan tangan, buka-kepal jari 10 kali, lalu goyangkan tangan agar rileks.'}, {e: '🌬️', t: 'Napas & minum', d: 'Tarik napas dalam lewat hidung 5 kali, hembuskan perlahan. Minum air putih sebelum kembali bekerja.'} ];var REST_MS = 5 * 60 * 1000;function inPrayerWindow(now) {if (!S.remind || !DATA) return false;var l = instants(), i;for (i = 0;i < l.length;i++) {if (l[i].wajib && now >= l[i].t - 10 * 60000 && now <= l[i].t + 5 * 60000) return true;} return false;} function trackRest(now) {var dt = now - lastRestTick;lastRestTick = now;if (!S.rest || document.hidden || restOpen) return;activeMs += Math.min(Math.max(dt, 0), 2500);if (activeMs >= S.restEvery * 60000 && !inPrayerWindow(now)) {activeMs = 0;fireRest();}} function fireRest() {var tip = REST_TIPS[restTipIdx++ % REST_TIPS.length];stopAlert();showAlert('⏸️ Saatnya rehat 5 menit', tip + ' Jaga mata dan tubuhmu.', '🧘 Mulai rehat', openRest);if (typeof window.toast === 'function') window.toast('⏸️ Saatnya rehat 5 menit');notify('Saatnya rehat 5 menit', tip);} function softChime() {if (!S.sound) return;var ctx = getAudio();if (!ctx) return;try {var o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime;o.type = 'sine';o.frequency.value = 523;g.gain.setValueAtTime(0.0001, t0);g.gain.exponentialRampToValueAtTime(0.15, t0 + 0.05);g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.7);o.connect(g);g.connect(ctx.destination);o.start(t0);o.stop(t0 + 0.72);} catch (e) {}} function openRest() {restOpen = true;restEnd = 0;restStep = -1;$('restModal').style.display = 'flex';renderRest(0);} function closeRest() {restOpen = false;restEnd = 0;clearInterval(restTimerId);restTimerId = null;$('restModal').style.display = 'none';activeMs = 0;} function startRest() {getAudio();restEnd = Date.now() + REST_MS;clearInterval(restTimerId);restTimerId = setInterval(function () {renderRest(Date.now());}, 250);renderRest(Date.now());} function renderRest(now) {var running = restEnd > 0, left = running ? Math.max(0, restEnd - now) : REST_MS;var elapsed = REST_MS - left;var idx = running ? Math.min(REST_STEPS.length - 1, Math.floor(elapsed / 60000)) : 0;var done = running && left <= 0;var st = REST_STEPS[idx];if (done) {clearInterval(restTimerId);restTimerId = null;restEnd = 0;activeMs = 0;$('rs-emoji').textContent = '✅';$('rs-title').textContent = 'Rehat selesai';$('rs-desc').textContent = 'Badan dan mata sudah lebih segar. Silakan lanjutkan pekerjaan. Semangat!';$('rs-time').textContent = '00:00';$('rs-go').textContent = '▶ Ulangi';$('rs-bar').style.width = '100%';softChime();if (typeof window.toast === 'function') window.toast('✅ Rehat selesai, semangat!');return;} $('rs-emoji').textContent = st.e;$('rs-title').textContent = (running ? (idx + 1) + '/5 · ' : '') + st.t;$('rs-desc').textContent = running ? st.d : 'Lepaskan sejenak pekerjaanmu. Ada 5 langkah singkat, masing-masing 1 menit. Tekan Mulai.';var sec = Math.ceil(left / 1000);$('rs-time').textContent = pad(Math.floor(sec / 60)) + ':' + pad(sec % 60);$('rs-go').textContent = running ? '↺ Mulai ulang' : '▶ Mulai';$('rs-bar').style.width = (running ? (elapsed / REST_MS * 100) : 0) + '%';if (running && idx !== restStep) {if (restStep !== -1) softChime();restStep = idx;}} var CSS = '' + '.sh-chip{margin-top:3px;font-size:.62rem;line-height:1.2;color:var(--primary);cursor:pointer;padding:2px 8px;border-radius:999px;' + 'border:1px solid color-mix(in srgb,var(--primary) 40%,transparent);background:color-mix(in srgb,var(--primary) 10%,transparent);white-space:nowrap;font-weight:600}' + '.sh-chip:hover{background:color-mix(in srgb,var(--primary) 22%,transparent)}' + '.sh-card{width:100%;max-width:420px;margin-bottom:0;max-height:92vh;overflow-y:auto}' + '.sh-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}' + '.sh-head h3{margin:0!important;color:var(--primary)!important}' + '.sh-x{background:none;border:none;color:var(--danger);font-size:1.5rem;cursor:pointer}' + '.sh-top{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:var(--text-muted);margin-bottom:2px}' + '.sh-badge{background:var(--primary);color:var(--on-primary,#fff);font-weight:700;font-size:.72rem;padding:2px 10px;border-radius:999px}' + '.sh-loc{font-size:.8rem;margin-bottom:10px}' + '.sh-next{text-align:center;padding:12px;border-radius:calc(var(--radius,16px) - 4px);margin-bottom:10px;' + 'background:color-mix(in srgb,var(--primary) 14%,transparent);border:1px solid color-mix(in srgb,var(--primary) 35%,transparent)}' + '.sh-next small{display:block;font-size:.7rem;color:var(--text-muted)}' + '.sh-next b{font-size:1.15rem;color:var(--text-main)}' + '.sh-next .sh-cd{display:block;font-size:1.6rem;font-weight:700;color:var(--primary);font-variant-numeric:tabular-nums;letter-spacing:1px}' + '.sh-row{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:10px;font-size:.9rem;border:1px solid transparent}' + '.sh-row+.sh-row{margin-top:2px}' + '.sh-row.past{opacity:.5}' + '.sh-row.minor{font-size:.8rem;color:var(--text-muted)}' + '.sh-row.next{background:color-mix(in srgb,var(--primary) 16%,transparent);border-color:var(--primary);font-weight:700}' + '.sh-row time{font-variant-numeric:tabular-nums;font-weight:700}' + '.sh-src{font-size:.68rem;color:var(--text-muted);margin:8px 0 12px;text-align:center}' + '.sh-sep{border:none;border-top:1px solid var(--border-color);margin:12px 0}' + '.sh-set{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0;font-size:.82rem}' + '.sh-set select{max-width:55%;padding:6px 8px;font-size:.8rem}' + '.sh-btns{display:flex;gap:8px;margin-top:8px}' + '.sh-btns button{flex:1;padding:9px 6px;font-size:.78rem;cursor:pointer;font-weight:700;border-radius:calc(var(--radius,16px) - 6px);' + 'border:1px solid var(--border-color);background:transparent;color:var(--text-main)}' + '.sh-btns button:hover{border-color:var(--primary)}' + '.sh-status{font-size:.7rem;color:var(--text-muted);min-height:1em;margin-top:6px}' + '.sh-sw{position:relative;width:42px;height:24px;flex:none}' + '.sh-sw input{opacity:0;width:100%;height:100%;position:absolute;inset:0;margin:0;cursor:pointer;z-index:2}' + '.sh-sw i{position:absolute;inset:0;background:var(--border-color);border-radius:999px;transition:.2s}' + '.sh-sw i:after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}' + '.sh-sw input:checked+i{background:var(--primary)}' + '.sh-sw input:checked+i:after{transform:translateX(18px)}' + '.rs-card{text-align:center}' + '.rs-emoji{font-size:3rem;line-height:1.1;margin:6px 0}' + '.rs-title{font-weight:700;font-size:1.05rem;color:var(--text-main);margin-bottom:6px}' + '.rs-desc{font-size:.85rem;color:var(--text-muted);line-height:1.45;min-height:3.6em}' + '.rs-time{font-size:2.4rem;font-weight:700;color:var(--primary);font-variant-numeric:tabular-nums;margin:10px 0 6px}' + '.rs-track{height:6px;border-radius:999px;background:var(--border-color);overflow:hidden;margin-bottom:12px}' + '.rs-track i{display:block;height:100%;width:0;background:var(--primary);transition:width .25s linear}' + '#sh-alert{position:fixed;left:50%;top:12px;transform:translate(-50%,-140%);width:calc(100% - 24px);max-width:420px;z-index:6000;display:flex;gap:10px;align-items:flex-start;' + 'padding:12px 14px;border-radius:14px;background:var(--primary);color:var(--on-primary,#fff);box-shadow:0 8px 30px rgba(0,0,0,.35);transition:transform .35s}' + '#sh-alert.show{transform:translate(-50%,0)}' + '#sh-alert div{flex:1;display:flex;flex-direction:column;font-size:.8rem;line-height:1.35}' + '#sh-alert b{font-size:.92rem}' + '#sh-alert button{background:none;border:none;color:inherit;font-size:1.3rem;cursor:pointer;line-height:1}' + '#sh-alert .sh-stop{font-size:.72rem;font-weight:700;padding:6px 10px;border-radius:999px;border:1px solid currentColor;white-space:nowrap;align-self:center}';function sw(id) {return '<label class="sh-sw"><input type="checkbox" id="' + id + '"><i></i></label>';} function cityOptions() {var html = '<option value="auto">📍 Otomatis (GPS)</option>';['WIB', 'WITA', 'WIT'].forEach(function (z) {html += '<optgroup label="' + z + '">';CITIES.filter(function (c) {return c[3] === z;}).forEach(function (c) {html += '<option value="' + c[0] + '">' + c[0] + '</option>';});html += '</optgroup>';});return html;} function buildUI() {var st = document.createElement('style');st.textContent = CSS;document.head.appendChild(st);var clock = $('digital-clock');if (clock) {var chip = document.createElement('div');chip.className = 'sh-chip';chip.id = 'sh-chip';chip.setAttribute('role', 'button');chip.setAttribute('tabindex', '0');chip.style.display = 'none';chip.addEventListener('click', openModal);chip.addEventListener('keydown', function (e) {if (e.key === 'Enter') openModal();});clock.appendChild(chip);} var al = document.createElement('div');al.id = 'sh-alert';al.innerHTML = '<div><b></b><span></span></div><button type="button" class="sh-stop" id="sh-act" style="display:none"></button><button type="button" class="sh-stop" id="sh-stop">🔕 Hentikan</button><button type="button" class="sh-x2" aria-label="Tutup">&times;</button>';al.querySelectorAll('button').forEach(function (bt) {bt.addEventListener('click', stopAlert);});al.querySelector('#sh-act').addEventListener('click', function () {var f = alertAct;if (f) f();});document.body.appendChild(al);var m = document.createElement('div');m.id = 'sholatModal';m.className = 'overlay';m.style.zIndex = '3650';m.innerHTML = '<div class="card sh-card">' + '<div class="sh-head"><h3>🕌 Waktu Sholat</h3><button type="button" class="sh-x" id="sh-close">&times;</button></div>' + '<div class="sh-top"><span id="sh-date"></span><span class="sh-badge" id="sh-zone">WIB</span></div>' + '<div class="sh-loc">📍 <span id="sh-loc"></span></div>' + '<div class="sh-next"><small id="sh-next-lbl">Sholat berikutnya</small><b id="sh-next-name">-</b><span class="sh-cd" id="sh-cd">--:--:--</span></div>' + '<div id="sh-list"></div>' + '<div class="sh-src" id="sh-src"></div>' + '<hr class="sh-sep">' + '<div class="sh-set"><span>Lokasi</span><select id="sh-city">' + cityOptions() + '</select></div>' + '<div class="sh-btns"><button type="button" id="sh-gps">📍 Deteksi lokasi saya</button></div>' + '<div class="sh-status" id="sh-gps-status"></div>' + '<div class="sh-set"><span>Tampilkan jadwal &amp;hitung mundur di header</span>' + sw('sh-chip-on') + '</div>' + '<div class="sh-set"><span>Pengingat waktu sholat</span>' + sw('sh-remind') + '</div>' + '<div class="sh-set"><span>Ingatkan sebelumnya</span><select id="sh-lead">' + '<option value="0">Tepat waktu saja</option><option value="5">5 menit sebelum</option>' + '<option value="10">10 menit sebelum</option><option value="15">15 menit sebelum</option></select></div>' + '<div class="sh-set"><span>Suara pengingat</span>' + sw('sh-sound') + '</div>' + '<div class="sh-btns"><button type="button" id="sh-test">🔔 Tes pengingat</button></div>' + '<hr class="sh-sep">' + '<div class="sh-set"><span>Pengingat rehat mata &amp;tubuh</span>' + sw('sh-rest') + '</div>' + '<div class="sh-set"><span>Ingatkan setiap</span><select id="sh-rest-every">' + '<option value="30">30 menit</option><option value="45">45 menit</option>' + '<option value="60">60 menit</option><option value="90">90 menit</option></select></div>' + '<div class="sh-btns"><button type="button" id="sh-rest-now">🧘 Rehat 5 menit sekarang</button></div>' + '<div class="sh-status" id="sh-note">Pengingat berbunyi selama aplikasi ini terbuka di browser.</div>' + '</div>';m.addEventListener('click', function (e) {if (e.target === m) closeModal();});document.body.appendChild(m);var r = document.createElement('div');r.id = 'restModal';r.className = 'overlay';r.style.zIndex = '3660';r.innerHTML = '<div class="card sh-card rs-card">' + '<div class="sh-head"><h3>🧘 Rehat 5 Menit</h3><button type="button" class="sh-x" id="rs-close">&times;</button></div>' + '<div class="rs-emoji" id="rs-emoji">🧘</div><div class="rs-title" id="rs-title"></div><div class="rs-desc" id="rs-desc"></div>' + '<div class="rs-time" id="rs-time">05:00</div><div class="rs-track"><i id="rs-bar"></i></div>' + '<div class="sh-btns"><button type="button" id="rs-go">▶ Mulai</button><button type="button" id="rs-skip">Tutup</button></div>' + '</div>';r.addEventListener('click', function (e) {if (e.target === r) closeRest();});document.body.appendChild(r);$('rs-close').addEventListener('click', closeRest);$('rs-skip').addEventListener('click', closeRest);$('rs-go').addEventListener('click', startRest);$('sh-close').addEventListener('click', closeModal);$('sh-gps').addEventListener('click', function () {S.mode = 'auto';saveSettings();syncSettingsUI();requestGPS(true);});$('sh-city').addEventListener('change', function () {if (this.value === 'auto') {S.mode = 'auto';saveSettings();refresh(true);silentGPS();} else {S.mode = 'manual';S.city = this.value;saveSettings();refresh(true);}});$('sh-chip-on').addEventListener('change', function () {S.chip = this.checked;saveSettings();lastChip = '';tick();});$('sh-sound').addEventListener('change', function () {S.sound = this.checked;saveSettings();if (this.checked) getAudio();});$('sh-lead').addEventListener('change', function () {S.lead = +this.value;saveSettings();});$('sh-remind').addEventListener('change', function () {S.remind = this.checked;saveSettings();if (this.checked) {getAudio();if ('Notification' in window && Notification.permission === 'default') {try {Notification.requestPermission().then(updateNote);} catch (e) {updateNote();}}} updateNote();});$('sh-rest').addEventListener('change', function () {S.rest = this.checked;activeMs = 0;saveSettings();});$('sh-rest-every').addEventListener('change', function () {S.restEvery = +this.value;activeMs = 0;saveSettings();});$('sh-rest-now').addEventListener('click', function () {closeModal();openRest();});$('sh-test').addEventListener('click', function () {var zl = DATA ? ZONES[DATA.loc.zone].lbl : '';getAudio();fire('Tes pengingat sholat', 'Pengingat berfungsi. Zona waktu ' + zl + '.');});document.addEventListener('pointerdown', function once() {document.removeEventListener('pointerdown', once);if (S.remind && S.sound) getAudio();});} function updateNote() {var n = $('sh-note');if (!n) return;var t = 'Pengingat berbunyi selama aplikasi ini terbuka di browser.';if (S.remind) {if (!('Notification' in window)) t += ' Notifikasi sistem tidak didukung, banner & suara tetap aktif.';else if (Notification.permission === 'denied') t += ' Notifikasi sistem diblokir, banner & suara tetap aktif.';else if (Notification.permission === 'granted') t += ' Notifikasi sistem aktif.';} n.textContent = t;} function syncSettingsUI() {if (!$('sh-city')) return;$('sh-city').value = S.mode === 'auto' ? 'auto' : S.city;$('sh-chip-on').checked = !!S.chip;$('sh-remind').checked = !!S.remind;$('sh-sound').checked = !!S.sound;$('sh-lead').value = String(S.lead);$('sh-rest').checked = !!S.rest;$('sh-rest-every').value = String(S.restEvery);updateNote();} function openModal() {modalOpen = true;$('sholatModal').style.display = 'flex';syncSettingsUI();renderModal();tick();if (S.mode === 'auto' && !jget(LS_GPS, null) && !openModal._asked) {openModal._asked = true;requestGPS(true);}} function closeModal() {modalOpen = false;$('sholatModal').style.display = 'none';} var HARI = ['Ahad', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];var BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];function renderModal() {if (!DATA || !modalOpen) return;var y = DATA.ymd[0], m = DATA.ymd[1], d = DATA.ymd[2];var dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();$('sh-date').textContent = HARI[dow] + ', ' + d + ' ' + BULAN[m - 1] + ' ' + y;var z = ZONES[DATA.loc.zone];$('sh-zone').textContent = z.lbl + ' (UTC+' + z.off + ')';$('sh-loc').textContent = DATA.loc.name + (DATA.loc.gps ? ' • GPS' : '');var src = DATA.pending ? 'Memuat dari server…' : (DATA.src === 'api' ? 'Sumber: AlAdhan API • metode Kemenag RI' : 'Offline: hitungan perkiraan (sudut Kemenag), bisa selisih ±2 menit');$('sh-src').textContent = src;updateModal(Date.now());} function updateModal(now) {if (!DATA) return;var list = instants(), nx = nextPrayer(now), html = '';list.forEach(function (p) {var cls = 'sh-row' + (p.wajib ? '' : ' minor') + (p.t <= now ? ' past' : '') + (!nx.besok && p.key === nx.key ? ' next' : '');html += '<div class="' + cls + '"><span>' + p.nama + '</span><time>' + p.hhmm + '</time></div>';});var l = $('sh-list');if (l && l._h !== html) {l.innerHTML = html;l._h = html;} $('sh-next-lbl').textContent = nx.besok ? 'Sholat berikutnya (besok)' : 'Sholat berikutnya';$('sh-next-name').textContent = nx.nama + ' • ' + nx.hhmm + ' ' + ZONES[DATA.loc.zone].lbl;$('sh-cd').textContent = fmtCount(nx.t - now);} function updateChip(now) {var c = $('sh-chip');if (!c) return;if (!DATA) {if (c.style.display !== 'none') c.style.display = 'none';lastChip = '';return;} var txt;if (S.chip) {var nx = nextPrayer(now);txt = '🕌 ' + nx.nama + ' • ' + nx.hhmm + ' ' + ZONES[DATA.loc.zone].lbl + ' • ' + fmtShort(nx.t - now);} else {txt = '🕌';} if (txt !== lastChip) {c.textContent = txt;lastChip = txt;} if (c.style.display === 'none') c.style.display = '';} function renderAll() {renderModal();updateChip(Date.now());} var zoneCheckAt = 0;function tick() {trackRest(Date.now());if (!DATA) return;var now = Date.now();if (!sameYmd(todayInZone(DATA.loc.zone), DATA.ymd)) {refresh(true);return;} if (now - zoneCheckAt > 30000) {zoneCheckAt = now;var loc = resolveLocation();if (loc.zone !== DATA.loc.zone || cacheKey(loc, todayInZone(loc.zone)) !== DATA.key) {refresh(true);return;}} updateChip(now);if (modalOpen) updateModal(now);checkReminders(now);} function init() {buildUI();refresh(false);silentGPS();setInterval(tick, 1000);document.addEventListener('visibilitychange', function () {if (!document.hidden) {zoneCheckAt = 0;silentGPS();tick();}});} window.SHOLAT = {open: openModal, close: closeModal, stop: stopAlert, rest: openRest, refresh: function () {refresh(true);}, _calc: calcTimes, _detectZone: detectZone};if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);else init();})();
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DEJEDE | Buku Tamu</title>
+    <!-- FAVICON -->
+    <link rel="icon" href="./favicon/favicon.ico" sizes="any">
+    <!-- (opsional tapi direkomendasikan) -->
+    <link rel="icon" type="favicon/png" sizes="32x32" href="./favicon/favicon-32x32.png">
+    <link rel="icon" type="favicon/png" sizes="16x16" href="./favicon/favicon-16x16.png">
+    <link rel="dejede-icon" href="./favicon/favicon-32x32.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="tema.css">
+    <meta name="theme-color" content="#3e5241">
+    
+
+</head>
+
+<body data-theme="sage">
+
+<div id="login-screen">
+    <span class="blob b1"></span><span class="blob b2"></span>
+    <div class="card login-card">
+        <div class="login-logo"><img src="images/logo.png" alt="DEJEDE" onerror="this.src='https://via.placeholder.com/60'"></div>
+        <h2>DEJEDE <span>BUKUTAMU</span></h2>
+        <p class="login-sub">Buku tamu digital &amp; manajemen amplop untuk acara pernikahan, khitanan, dan tasyakuran.</p>
+
+        <div class="login-feat">
+            <span>📝 Input tamu cepat</span>
+            <span>📊 Rekap &amp; grafik</span>
+            <span>🖨 Cetak laporan A4</span>
+            <span>💾 Backup JSON</span>
+        </div>
+
+        <div class="pass-wrap">
+            <span class="pass-ico">🔒</span>
+            <input type="password" id="pass-input" placeholder="Masukkan password" autocomplete="current-password" onkeyup="if(event.key === 'Enter') checkLogin()">
+            <button type="button" class="pass-eye" onclick="togglePass()" aria-label="Tampilkan password">👁</button>
+        </div>
+        <button class="btn-main login-btn" onclick="checkLogin()">Masuk Sistem →</button>
+        <p id="login-error" style="display:none;">⚠️ Password salah, coba lagi.</p>
+
+        <div class="login-foot">Dejede Photography &amp; Videography<br>Data tersimpan aman di perangkat Anda</div>
+    </div>
+</div>
+
+<div class="sticky-header">
+    <header class="topbar">
+        <div class="logo-wrapper">
+            <img src="images/logo.png" class="main-logo" onerror="this.src='https://via.placeholder.com/40'">
+            <div class="logo">DEJEDE GUESSBOOK <span>Buku Tamu & Manajemen Amplop</span></div>
+        </div>
+        <div id="digital-clock">
+            <div id="clock-time">00:00:00</div>
+            <div id="clock-date">SENIN - 01:01:2026</div>
+        </div>
+        <div class="top-actions">
+	<button class="btn-main devhub-btn"
+			onclick="window.open('https://wa.me/6285236578999','_blank')">
+			<img src="images/wa-icon.svg" class="devhub-icon">
+		Chat Center
+	</button>
+</div>
+    </header>
+
+    <div class="marquee-container">
+        <div class="marquee-content" id="running-text-1">
+            <span id="kalimat-ucapan">Memuat info acara...</span>
+        </div>
+    </div>
+
+    <div class="marquee-container brand-marquee">
+        <div class="marquee-content" style="animation-duration:45s;">
+            <span>
+                🏝️ <b>Abadikan Setiap Detik Berharga Bersama DEJEDE</b> - <i>"Karena Momen Takkan Terulang, Biarkan Kami Menjaganya Dalam Karya Visual Terbaik."</i> 📸 Spesialis Dokumentasi Profesional & Editing High-Res. 
+	<a href="https://wa.me/6285236578999" target="_blank" class="wa-link">
+    <img src="images/wa-icon.svg" class="wa-icon">
+    Reservasi WhatsApp ke Admin: <b>6285236578999</b> klik saja nomornya
+</a>
+            </span>
+        </div>
+    </div>
+
+    <section class="dashboard">
+        <div class="stat-box"><span>Tamu</span><strong id="stat-tamu">0</strong></div>
+        <div class="stat-box"><span>Total</span><strong id="stat-uang">Rp 0</strong></div>
+        <div class="stat-box"><span>Rata-rata</span><strong id="stat-avg">Rp 0</strong></div>
+        <div class="stat-box"><span>Terakhir</span><strong id="stat-last">-</strong></div>
+    </section>
+</div>
+
+<main class="layout">
+    <aside class="sidepanel">
+        <div class="card">
+            <h3>Trend Pemasukan</h3>
+            <canvas id="moneyChart"></canvas>
+        </div>
+        <div class="card">
+            <h3>Top 5 Penyumbang</h3>
+            <ul id="top-donors" style="list-style:none; font-size: 0.8rem; padding:0;"></ul>
+        </div>
+        <div class="card">
+            <h3>Konfigurasi Acara</h3>
+            <form id="event-form">
+                <div class="field">
+                    <label for="mempelai" id="lbl-mempelai" title="Nama mempelai / anak yang punya hajat"><span id="lbl-mempelai-txt">Nama Mempelai</span> <span class="req">*</span></label>
+                    <input id="mempelai" placeholder="Contoh: Andi &amp; Sinta" required>
+                    <div class="hint" id="hint-mempelai">⚠ Belum diisi — ketik nama mempelai</div>
+                </div>
+                <div class="field">
+                    <label for="hajat" title="Nama bapak/ibu tuan rumah">Nama Tuan Rumah <span class="req">*</span></label>
+                    <input id="hajat" placeholder="Contoh: Bpk. Slamet" required>
+                    <div class="hint">⚠ Belum diisi — ketik nama tuan rumah</div>
+                </div>
+                <div class="field">
+                    <label for="alamat-acara" title="Tempat acara berlangsung">Lokasi Acara <span class="req">*</span></label>
+                    <input id="alamat-acara" placeholder="Contoh: Desa Purorejo" required>
+                    <div class="hint">⚠ Belum diisi — ketik lokasi acara</div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="acara-select" title="Pilih jenis acara">Jenis Acara</label>
+                        <select id="acara-select">
+                            <option value="Pernikahan">Pernikahan</option>
+                            <option value="Khitanan">Khitanan</option>
+                            <option value="Tasyakuran">Tasyakuran</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="target-undangan" title="Jumlah tamu yang diundang (angka)">Jumlah Undangan <span class="req">*</span></label>
+                        <input id="target-undangan" type="number" inputmode="numeric" min="1" placeholder="Isi angka, mis. 500" required>
+                        <div class="hint">⚠ Wajib diisi angka jumlah undangan</div>
+                    </div>
+                </div>
+                <button class="btn-main" type="button" onclick="toast('✅ Data tersimpan otomatis')">Data Auto-Save</button>
+            </form>
+        </div>
+    </aside>
+
+    <section class="content">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; font-size: 0.75rem;">
+                <span>Progress Kehadiran</span>
+                <span id="progress-text">0/500 Tamu</span>
+            </div>
+            <div class="progress-bar"><div id="progress-fill" style="width: 0%;"></div></div>
+        </div>
+
+        <div id="list-tamu-container">
+            <div class="tabs">
+                <button class="tab-btn btn-semua active" onclick="switchTab('semua')">Semua</button>
+                <button class="tab-btn btn-pria" onclick="switchTab('Pria')">Pria</button>
+                <button class="tab-btn btn-wanita" onclick="switchTab('Wanita')">Wanita</button>
+            </div>
+
+            <div class="card" style="border-top: none; border-top-left-radius: 0; margin-top: -1px;">
+                <input id="searchBox" placeholder="🔍 Cari nama atau alamat..." style="margin-bottom: 15px;">
+                <div class="table-container">
+                    <table id="guest-table">
+                        <thead>
+                            <tr>
+                                <th style="width:30px;text-align:center;">No</th>
+                                <th class="sortable" data-key="nama" onclick="setSort('nama')" title="Urutkan nama A-Z / Z-A">Nama <span class="sort-ico"></span></th>
+                                <th class="sortable" data-key="alamat" onclick="setSort('alamat')" title="Urutkan alamat A-Z / Z-A">Alamat <span class="sort-ico"></span></th>
+                                <th style="width:50px;">Gdr</th> 
+                                <th class="sortable" data-key="jumlah" style="width:100px;" onclick="setSort('jumlah')" title="Urutkan jumlah kecil-besar / besar-kecil">Jumlah <span class="sort-ico"></span></th>
+                                <th>Ket</th>
+                                <th class="col-aksi" style="text-align:center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guest-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="pagination" style="text-align:center;margin-top:12px; display: flex; justify-content: center; gap: 10px; align-items: center;">
+                    <button onclick="prevPage()" class="btn-page">‹ Prev</button>
+                    <span id="page-info" style="font-size: 0.8rem;">Page 1</span>
+                    <button onclick="nextPage()" class="btn-page">Next ›</button>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<nav class="floating-nav">
+    <button class="nav-item active" onclick="goHome()"><i>🏠</i><span>Home</span></button>
+    <button class="nav-item" onclick="openAddModal()"><i>➕</i><span>Tambah</span></button>
+    <button class="nav-item" onclick="openBackupMenu()"><i>💾</i><span>Sistem</span></button>
+    <button class="nav-item" onclick="openThemePicker()"><i>🎨</i><span>Tema</span></button>
+    <button class="nav-item" onclick="previewTable()"><i>📊</i><span>Cetak</span></button>
+	
+</nav>
+
+<div id="addModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index:3000; padding:20px; align-items:center; justify-content:center;">
+    <div class="card" style="width:100%; max-width:400px; margin-bottom:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin-bottom:0; color: var(--primary);">📝 Input Tamu</h3>
+            <button type="button" onclick="closeAddModal()" style="background:none; border:none; color:var(--danger); font-size:1.5rem;">&times;</button>
+        </div>
+        <form id="guest-form">
+            <input id="tamu-nama" placeholder="Nama Lengkap" required style="margin-bottom:10px;">
+<div class="field ac-wrap" style="margin-bottom:10px;">
+                <input id="tamu-alamat" placeholder="Alamat / Desa (ketik huruf awal, mis. P)" required autocomplete="off" autocapitalize="words">
+                <ul id="ac-list" class="ac-list"></ul>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <select id="tamu-gender"><option value="Pria">Pria</option><option value="Wanita">Wanita</option></select>
+                <div class="ac-wrap">
+                    <input id="tamu-jumlah" type="number" inputmode="numeric" placeholder="Nominal Rp" required autocomplete="off">
+                    <ul id="nom-list" class="ac-list"></ul>
+                </div>
+            </div>
+            <input id="tamu-keterangan" placeholder="Keterangan (opsional)" style="margin-bottom:20px;">
+            <button class="btn-main" type="submit" style="height: 50px;">💾 Simpan Data</button>
+        </form>
+    </div>
+</div>
+
+<div id="themeModal" onclick="if(event.target===this)closeThemePicker()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index:3500; padding:20px; align-items:center; justify-content:center;">
+    <div class="card" style="width:100%; max-width:520px; margin-bottom:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h3 style="margin-bottom:0; color: var(--primary);">🎨 Pilih Tema</h3>
+            <button type="button" onclick="closeThemePicker()" style="background:none; border:none; color:var(--danger); font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+        <div id="theme-grid" class="theme-grid"></div>
+    </div>
+</div>
+<div id="sysModal" onclick="if(event.target===this)closeSysMenu()" class="overlay" style="z-index:3600;">
+    <div class="card" style="width:100%; max-width:380px; margin-bottom:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h3 style="margin-bottom:0; color: var(--primary);">⚙️ Sistem DEJEDE</h3>
+            <button type="button" onclick="closeSysMenu()" style="background:none; border:none; color:var(--danger); font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+        <div class="sys-list">
+            <button type="button" class="sys-item" onclick="sysAction(1)"><i>⬇️</i><span><b>Download JSON</b><small>Simpan cadangan data tamu</small></span></button>
+            <button type="button" class="sys-item" onclick="sysAction(2)"><i>⬆️</i><span><b>Restore JSON</b><small>Pulihkan data dari file cadangan</small></span></button>
+            <button type="button" class="sys-item" onclick="sysAction(5)"><i>🖥️</i><span><b>Tampilan Monitor</b><small>Layar display untuk TV / proyektor</small></span></button>
+            <button type="button" class="sys-item danger" onclick="sysAction(3)"><i>🗑️</i><span><b>Hapus Semua</b><small>Hapus seluruh data permanen</small></span></button>
+            <button type="button" class="sys-item" onclick="sysAction(4)"><i>🚪</i><span><b>Logout</b><small>Keluar dari sistem</small></span></button>
+        </div>
+    </div>
+</div>
+<div id="confirmModal" class="overlay" style="z-index:3700;">
+    <div class="card" style="width:100%; max-width:320px; margin-bottom:0; text-align:center;">
+        <div style="font-size:2rem; margin-bottom:6px;">⚠️</div>
+        <p id="confirm-msg" style="font-size:.9rem; margin-bottom:16px;"></p>
+        <div style="display:flex; gap:10px;">
+            <button type="button" class="btn-ghost" onclick="closeConfirm()">Batal</button>
+            <button type="button" class="btn-main btn-yes" id="confirm-yes">Ya</button>
+        </div>
+    </div>
+</div>
+<div id="toast"></div>
+
+<script src="desa.js"></script>
+<script src="sholat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const SECRET_PASS = "dejede"; 
+
+// 1. AUTHENTICATION
+function checkLogin() {
+    const input = document.getElementById('pass-input');
+    const errorMsg = document.getElementById('login-error');
+    const loginCard = document.querySelector('#login-screen .card');
+
+    if (input.value === SECRET_PASS) {
+
+        sessionStorage.setItem('dejede_auth', 'true');
+        document.getElementById('login-screen').style.display = 'none';
+
+        // tampilkan tutorial setelah login
+        showTutorialOnce();
+
+    } else {
+
+        errorMsg.style.display = 'block';
+
+        loginCard.style.animation = 'none';
+        setTimeout(() => {
+            loginCard.style.animation = 'shake 0.4s';
+        }, 10);
+
+        input.value = '';
+        input.focus();
+    }
+}
+
+// Tambahkan listener untuk menghilangkan pesan error saat mengetik
+document.getElementById('pass-input').addEventListener('input', function() {
+    document.getElementById('login-error').style.display = 'none';
+});
+
+function togglePass() {
+    const i = document.getElementById('pass-input');
+    i.type = i.type === 'password' ? 'text' : 'password';
+}
+function logoutSystem() { confirmBox('Logout dari sistem?', doLogout); }
+function doLogout() {
+    {
+
+        sessionStorage.removeItem('dejede_auth');
+
+        // reset tutorial supaya muncul lagi saat login
+        localStorage.removeItem('dejedeTutorialShown');
+
+        location.reload();
+    }
+}
+
+// 2. CLOCK
+function startClock() {
+    const days = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
+
+    setInterval(() => {
+        const now = new Date();
+
+        // Jam digital
+        document.getElementById('clock-time').innerText =
+            now.toLocaleTimeString('id-ID', { hour12: false });
+
+        // Tanggal dengan nama bulan
+        document.getElementById('clock-date').innerText =
+            `${days[now.getDay()]} - ` +
+            now.toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+
+    }, 1000);
+}
+
+// 3. CORE DATA
+let eventData = JSON.parse(localStorage.getItem('dejedeEvent')) || { acara: 'Pernikahan', mempelai: '', hajat: '', alamat: '' };
+let guestsData = JSON.parse(localStorage.getItem('dejedeGuests')) || [];
+let targetUndangan = parseInt(localStorage.getItem('dejedeTarget')) || 500;
+let currentTab = 'semua';
+let currentPage = 1;
+let rowsPerPage = 50;
+let myChart;
+let editingGuestId = null;
+
+// 4. INITIALIZATION
+document.addEventListener('DOMContentLoaded', () => {
+    if (sessionStorage.getItem('dejede_auth') === 'true') {
+        document.getElementById('login-screen').style.display = 'none';
+    }
+    
+    // Theme
+    initTheme();
+    initAutocomplete();
+    initNominal();
+    
+    startClock();
+    loadEventInfo();
+    renderAll();
+    initAutoUpdate();
+    
+    document.getElementById('searchBox').oninput = () => { currentPage = 1; renderTable(); };
+});
+
+function loadEventInfo() {
+    document.getElementById('mempelai').value = eventData.mempelai;
+    updateLabelAcara();
+    document.getElementById('hajat').value = eventData.hajat;
+    document.getElementById('alamat-acara').value = eventData.alamat;
+    document.getElementById('target-undangan').value = targetUndangan || '';
+    document.getElementById('acara-select').value = eventData.acara;
+    
+    // Kalimat yang lebih panjang, sopan, dan profesional
+    const teksUtama = `✨ Selamat Datang di Kediaman Bapak/Ibu <b>${eventData.hajat || '...'}</b> dalam Rangka Syukuran ${eventData.acara} Ananda <b>${eventData.mempelai || '...'}</b> yang Berlokasi di ${eventData.alamat || '...'} ✨`;
+    
+    const teksDoa = ` 🙏 Doa Restu Anda Adalah Karunia Terindah Bagi Kami. Semoga Langkah Kaki Bapak/Ibu Menjadi Berkah Bagi Keluarga Besar Kami. Terima Kasih Atas Kehadirannya. 🙏`;
+
+    const teksBrand = ` 📸 Dokumentasi Eksklusif oleh <b>Dejede Photography & Videography</b> - <i>"Capturing Every Precious Moments"</i> 📸 `;
+
+    // Gabungkan semua kalimat agar running text-nya panjang dan tidak kosong
+    const gabunganTeks = `${teksUtama} &nbsp;&nbsp; | &nbsp;&nbsp; ${teksDoa} &nbsp;&nbsp; | &nbsp;&nbsp; ${teksBrand} &nbsp;&nbsp; • &nbsp;&nbsp; `;
+
+    document.getElementById('running-text-1').innerHTML = `<span>${gabunganTeks}</span><span>${gabunganTeks}</span>`;
+}
+
+function initAutoUpdate() {
+    ['mempelai', 'hajat', 'alamat-acara', 'acara-select', 'target-undangan'].forEach(id => {
+        document.getElementById(id).addEventListener('input', (e) => {
+            if(id === 'target-undangan') {
+                targetUndangan = parseInt(e.target.value) || 0;
+                localStorage.setItem('dejedeTarget', targetUndangan);
+            } else {
+                const key = id === 'acara-select' ? 'acara' : id.replace('-acara', '');
+                eventData[key] = e.target.value;
+                localStorage.setItem('dejedeEvent', JSON.stringify(eventData));
+            }
+            loadEventInfo();
+            updateProgress();
+        });
+    });
+}
+
+// 5. RENDER LOGIC
+function renderAll() {
+    renderTable();
+    updateStats();
+    updateChart();
+    updateRanking();
+    updateProgress();
+}
+
+// Tandai bagian yang cocok dengan blok warna (utamakan awal kata)
+function hl(text, q) {
+    const t = String(text ?? ''), e = x => x.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    if (!q) return e(t);
+    const low = t.toLowerCase();
+    let p = low.indexOf(q);
+    if (p < 0) return e(t);
+    for (let i = p; i >= 0; i = low.indexOf(q, i + 1)) { if (i === 0 || /\s/.test(low[i - 1])) { p = i; break; } }
+    return e(t.slice(0, p)) + '<mark class="hl">' + e(t.slice(p, p + q.length)) + '</mark>' + e(t.slice(p + q.length));
+}
+
+let sortKey = null, sortDir = 'asc';
+function applySort(arr) {
+    if (!sortKey) return arr;
+    const d = sortDir === 'asc' ? 1 : -1;
+    return [...arr].sort((a, b) => sortKey === 'jumlah'
+        ? (a.jumlah - b.jumlah) * d
+        : String(a[sortKey] || '').localeCompare(String(b[sortKey] || ''), 'id', { sensitivity: 'base' }) * d);
+}
+function sortLabel() {
+    if (!sortKey) return '';
+    const k = { nama: 'Nama', alamat: 'Alamat', jumlah: 'Jumlah' }[sortKey];
+    const o = sortKey === 'jumlah' ? (sortDir === 'asc' ? 'Kecil-Besar' : 'Besar-Kecil') : (sortDir === 'asc' ? 'A-Z' : 'Z-A');
+    return `${k} (${o})`;
+}
+function setSort(key) {
+    if (sortKey !== key) { sortKey = key; sortDir = 'asc'; }
+    else if (sortDir === 'asc') sortDir = 'desc';
+    else sortKey = null;
+    currentPage = 1;
+    renderTable();
+}
+function updateSortHeader() {
+    document.querySelectorAll('#guest-table th.sortable').forEach(th => {
+        const on = th.dataset.key === sortKey, ico = th.querySelector('.sort-ico');
+        th.classList.toggle('sorted', on);
+        if (!on) { ico.textContent = '⇅'; return; }
+        ico.textContent = th.dataset.key === 'jumlah' ? (sortDir === 'asc' ? '▲ 1-9' : '▼ 9-1') : (sortDir === 'asc' ? '▲ A-Z' : '▼ Z-A');
+    });
+}
+
+function renderTable() {
+    const tbody = document.getElementById('guest-tbody');
+    let filtered = currentTab === 'semua' ? guestsData : guestsData.filter(g => g.gender === currentTab);
+    const search = document.getElementById('searchBox').value.trim().toLowerCase();
+    
+    if(search) {
+        // Urutan hasil: 0 = nama diawali kata ketik, 1 = awal kata lain di nama, 2 = di tengah/belakang nama, 3 = alamat
+        const rank = g => {
+            const n = g.nama.toLowerCase();
+            if (n.startsWith(search)) return 0;
+            if (n.split(/\s+/).some(w => w.startsWith(search))) return 1;
+            if (n.includes(search)) return 2;
+            return g.alamat.toLowerCase().includes(search) ? 3 : 9;
+        };
+        filtered = filtered.map(g => ({ g, r: rank(g) })).filter(x => x.r < 9)
+            .sort((a, b) => a.r - b.r || a.g.nama.localeCompare(b.g.nama, 'id')).map(x => x.g);
+    }
+
+    // Urut manual (klik judul kolom): klik 1 = naik, klik 2 = turun, klik 3 = kembali normal
+    filtered = applySort(filtered);
+    updateSortHeader();
+
+    const start = (currentPage - 1) * rowsPerPage;
+    const pageData = filtered.slice(start, start + rowsPerPage);
+    
+    tbody.innerHTML = pageData.map((g, i) => `
+        <tr>
+            <td align="center">${start + i + 1}</td>
+            <td><strong>${hl(g.nama, search)}</strong></td>
+            <td>${hl(g.alamat, search)}</td>
+            <td align="center">${g.gender[0]}</td>
+            <td style="color:#6BCB77;font-weight:bold;">${formatIDR(g.jumlah)}</td>
+            <td><small>${g.keterangan || '-'}</small></td>
+            <td class="col-aksi">
+                <div class="aksi">
+                    <button class="btn-edit" title="Edit" onclick="editGuest(${g.id})">✎</button>
+                    <button class="btn-delete" title="Hapus" onclick="deleteGuest(${g.id})">✕</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+    
+    document.getElementById("page-info").innerText = `Hal ${currentPage} / ${Math.ceil(filtered.length/rowsPerPage) || 1}`;
+}
+
+// 6. GUEST ACTIONS
+document.getElementById('guest-form').onsubmit = (e) => {
+    e.preventDefault();
+
+    // 1. Ambil nilai dari Select (pilihan) dan Input Manual (kustom)
+    const alamatFinal = titleCase(document.getElementById('tamu-alamat').value.trim());
+    simpanDesaBaru(alamatFinal);
+
+    const gData = {
+        id: editingGuestId || Date.now(),
+        nama: titleCase(document.getElementById('tamu-nama').value.trim()),
+        alamat: alamatFinal, // <--- Ini poin pentingnya, pakai alamatFinal
+        gender: document.getElementById('tamu-gender').value,
+        jumlah: parseInt(document.getElementById('tamu-jumlah').value) || 0,
+        keterangan: document.getElementById('tamu-keterangan').value
+    };
+
+    if(editingGuestId) {
+        const idx = guestsData.findIndex(g => g.id === editingGuestId);
+        guestsData[idx] = gData;
+    } else {
+        guestsData.push(gData);
+    }
+
+    localStorage.setItem('dejedeGuests', JSON.stringify(guestsData));
+    
+    // 3. Bersihkan form dan sembunyikan kotak kustom lagi
+    editingGuestId = null;
+    e.target.reset();
+    document.getElementById('ac-list').classList.remove('open');
+    
+    closeAddModal();
+    renderAll();
+};
+
+function deleteGuest(id) { confirmBox('Hapus data tamu ini?', () => doDeleteGuest(id)); }
+function doDeleteGuest(id) {
+    {
+        guestsData = guestsData.filter(g => g.id !== id);
+        localStorage.setItem('dejedeGuests', JSON.stringify(guestsData));
+        renderAll();
+    }
+}
+
+function editGuest(id) {
+    const g = guestsData.find(g => g.id === id);
+    if (!g) return;
+
+    editingGuestId = id;
+    
+    // Masukkan data lama ke input
+    document.getElementById('tamu-nama').value = g.nama;
+    document.getElementById('tamu-alamat').value = g.alamat; // Tetap muncul meski alamat kustom
+    document.getElementById('tamu-gender').value = g.gender;
+    document.getElementById('tamu-jumlah').value = g.jumlah;
+    document.getElementById('tamu-keterangan').value = g.keterangan || '';
+
+    // Custom Tampilan Modal biar jelas kalau ini lagi EDIT
+    document.querySelector('#addModal h3').innerText = "📝 Edit Data Tamu";
+    document.querySelector('#guest-form .btn-main').innerText = "💾 UPDATE DATA";
+
+    openAddModal();
+}
+// 7. UTILS
+function formatIDR(n) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+}
+
+function updateStats() {
+    const total = guestsData.reduce((s, g) => s + g.jumlah, 0);
+    document.getElementById('stat-tamu').innerText = guestsData.length;
+    document.getElementById('stat-uang').innerText = formatIDR(total);
+    document.getElementById('stat-avg').innerText = formatIDR(total / (guestsData.length || 1));
+    document.getElementById('stat-last').innerText = guestsData.length ? guestsData[guestsData.length-1].nama.split(' ')[0] : '-';
+}
+
+function updateProgress() {
+    cekHintEvent();
+    const p = targetUndangan > 0 ? Math.min((guestsData.length / targetUndangan) * 100, 100).toFixed(1) : '0.0';
+    document.getElementById('progress-fill').style.width = p + '%';
+    document.getElementById('progress-text').innerText = `${guestsData.length}/${targetUndangan} Tamu (${p}%)`;
+}
+
+function switchTab(t) {
+    currentTab = t;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.innerText.includes(t) || (t==='semua' && b.innerText==='Semua')));
+    currentPage = 1;
+    renderTable();
+}
+
+// THEME, AUTOCOMPLETE, HINT, TOAST
+const THEMES = [
+    {id:'sage',n:'Sage Light',c:['#eef3ef','#f7faf7','#8ca98b']},
+    {id:'sage-dark',n:'Sage Dark',c:['#121212','#1e1e1e','#8ca98b']},
+    {id:'macos',n:'macOS Light',c:['#f2f2f7','#ffffff','#007aff']},
+    {id:'macos-dark',n:'macOS Dark',c:['#000000','#1c1c1e','#0a84ff']},
+    {id:'kde',n:'KDE Breeze',c:['#eff0f1','#fcfcfc','#3daee9']},
+    {id:'kde-dark',n:'KDE Breeze Dark',c:['#1b1e20','#31363b','#3daee9']},
+    {id:'win11',n:'Windows 11',c:['#f3f3f3','#fbfbfb','#0067c0']},
+    {id:'ubuntu',n:'Ubuntu Aubergine',c:['#2b0a22','#3c1232','#e95420']},
+    {id:'nord',n:'Nord',c:['#2e3440','#3b4252','#88c0d0']},
+    {id:'dracula',n:'Dracula',c:['#282a36','#343746','#bd93f9']}
+];
+function themeColor() { return getComputedStyle(document.body).getPropertyValue('--primary').trim() || '#8ca98b'; }
+function applyTheme(id) {
+    if (!THEMES.some(t => t.id === id)) id = 'sage';
+    document.body.dataset.theme = id;
+    localStorage.setItem('dejede-theme', id);
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.content = THEMES.find(t => t.id === id).c[2];
+    document.querySelectorAll('.theme-opt').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+    if (myChart) updateChart();
+}
+function initTheme() {
+    document.getElementById('theme-grid').innerHTML = THEMES.map(t => `
+        <button type="button" class="theme-opt" data-id="${t.id}" onclick="applyTheme('${t.id}')">
+            <span class="sw">${t.c.map(c => `<i style="background:${c}"></i>`).join('')}</span><b>${t.n}</b>
+        </button>`).join('');
+    applyTheme(localStorage.getItem('dejede-theme') || (localStorage.getItem('theme-pref') === 'dark' ? 'sage-dark' : 'sage'));
+}
+function openThemePicker() { document.getElementById('themeModal').style.display = 'flex'; }
+function closeThemePicker() { document.getElementById('themeModal').style.display = 'none'; }
+
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Label "Mempelai" / "Anak" mengikuti jenis acara
+function labelM() { return ({ Pernikahan: 'Mempelai', Khitanan: 'Anak', Tasyakuran: 'Yang Disyukuri' })[eventData.acara] || 'Mempelai'; }
+function updateLabelAcara() {
+    const l = labelM(), ph = { Mempelai: 'Contoh: Andi & Sinta', Anak: 'Contoh: Muhammad Arka', 'Yang Disyukuri': 'Contoh: Keluarga Besar Slamet' }[l];
+    document.getElementById('lbl-mempelai-txt').innerText = 'Nama ' + l;
+    document.getElementById('mempelai').placeholder = ph;
+    document.getElementById('hint-mempelai').innerText = '⚠ Belum diisi — ketik nama ' + l.toLowerCase();
+}
+
+// Tandai field wajib yang belum diisi (teks / angka > 0)
+function cekHintEvent() {
+    document.querySelectorAll('#event-form .field').forEach(f => {
+        const i = f.querySelector('input'); if (!i) return;
+        const v = i.value.trim();
+        const kosong = !v || (i.type === 'number' && !(parseFloat(v) > 0));
+        f.classList.toggle('invalid', kosong);
+    });
+}
+
+// AUTOCOMPLETE DESA (data dari desa.js + alamat baru yang pernah diketik)
+let desaList = [];
+function loadDesa() {
+    let custom = [];
+    try { custom = JSON.parse(localStorage.getItem('dejedeDesaCustom') || '[]'); } catch (e) {}
+    desaList = [...new Set([...(window.DATA_DESA || []), ...custom])].sort((a, b) => a.localeCompare(b, 'id'));
+}
+function titleCase(s) { return s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()); }
+function simpanDesaBaru(v) {
+    if (!v || desaList.some(d => d.toLowerCase() === v.toLowerCase())) return;
+    let custom = [];
+    try { custom = JSON.parse(localStorage.getItem('dejedeDesaCustom') || '[]'); } catch (e) {}
+    custom.push(v); localStorage.setItem('dejedeDesaCustom', JSON.stringify(custom)); loadDesa();
+}
+// SARAN NOMINAL OTOMATIS: ketik 50 -> Rp 50.000 & Rp 500.000
+function initNominal() {
+    const inp = document.getElementById('tamu-jumlah'), box = document.getElementById('nom-list');
+    let idx = -1, items = [];
+    const hide = () => { box.classList.remove('open'); idx = -1; };
+    const pick = v => { inp.value = v; hide(); };
+    const mark = () => [...box.children].forEach((li, i) => li.classList.toggle('active', i === idx));
+    inp.addEventListener('input', () => {
+        const v = parseInt(inp.value);
+        items = (v > 0) ? [1000, 10000, 100000, 1000000].map(k => v * k).filter(n => n <= 100000000) : [];
+        idx = -1;
+        if (!items.length) { hide(); return; }
+        box.innerHTML = items.map(n => `<li data-v="${n}">Rp ${n.toLocaleString('id-ID')}</li>`).join('');
+        box.classList.add('open');
+    });
+    inp.addEventListener('blur', () => setTimeout(hide, 120));
+    inp.addEventListener('keydown', e => {
+        if (!box.classList.contains('open')) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); idx = (idx + 1) % items.length; mark(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); idx = (idx - 1 + items.length) % items.length; mark(); }
+        else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); pick(items[idx]); }
+        else if (e.key === 'Escape') hide();
+    });
+    box.addEventListener('mousedown', e => { const li = e.target.closest('li'); if (li) { e.preventDefault(); pick(li.dataset.v); } });
+}
+
+function initAutocomplete() {
+    loadDesa();
+    const inp = document.getElementById('tamu-alamat'), box = document.getElementById('ac-list');
+    let idx = -1, items = [];
+    const hide = () => { box.classList.remove('open'); idx = -1; };
+    const pick = v => { inp.value = v; hide(); };
+    const mark = () => [...box.children].forEach((li, i) => li.classList.toggle('active', i === idx));
+    const show = () => {
+        const q = inp.value.trim().toLowerCase();
+        items = desaList.filter(d => d.toLowerCase().startsWith(q));
+        idx = -1;
+        if (!items.length) { hide(); return; }
+        box.innerHTML = items.map(d => {
+            return `<li data-v="${d}">${q ? '<mark>' + d.slice(0, q.length) + '</mark>' + d.slice(q.length) : d}</li>`;
+        }).join('');
+        box.classList.add('open');
+    };
+    const nm = document.getElementById('tamu-nama');
+    nm.addEventListener('input', () => { const a = nm.selectionStart, b = nm.selectionEnd; nm.value = titleCase(nm.value); nm.setSelectionRange(a, b); });
+    inp.addEventListener('input', () => { const a = inp.selectionStart, b = inp.selectionEnd; inp.value = titleCase(inp.value); inp.setSelectionRange(a, b); show(); });
+    inp.addEventListener('focus', show);
+    inp.addEventListener('blur', () => setTimeout(hide, 120));
+    inp.addEventListener('keydown', e => {
+        if (!box.classList.contains('open')) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); idx = (idx + 1) % items.length; mark(); box.children[idx].scrollIntoView({block:'nearest'}); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); idx = (idx - 1 + items.length) % items.length; mark(); box.children[idx].scrollIntoView({block:'nearest'}); }
+        else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); pick(items[idx]); }
+        else if (e.key === 'Escape') hide();
+    });
+    box.addEventListener('mousedown', e => { const li = e.target.closest('li'); if (li) { e.preventDefault(); pick(li.dataset.v); } });
+}
+
+function openAddModal() { document.getElementById('addModal').style.display = 'flex'; document.getElementById('tamu-nama').focus(); }
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+    editingGuestId = null;
+    
+    // Kembalikan ke judul semula
+    document.querySelector('#addModal h3').innerText = "📝 Input Tamu";
+    document.querySelector('#guest-form .btn-main').innerText = "💾 Simpan Data";
+}
+
+function goHome(){
+
+const target = document.getElementById("list-tamu-container");
+
+if(!target) return;
+
+/* tinggi header sticky */
+const header = document.querySelector(".sticky-header");
+const headerHeight = header ? header.offsetHeight : 0;
+
+/* posisi elemen */
+const y = target.getBoundingClientRect().top + window.pageYOffset - headerHeight - 10;
+
+window.scrollTo({
+top: y,
+behavior: "smooth"
+});
+
+}
+
+function filteredCount() {
+    let f = currentTab === 'semua' ? guestsData : guestsData.filter(g => g.gender === currentTab);
+    const q = document.getElementById('searchBox').value.toLowerCase();
+    if (q) f = f.filter(g => g.nama.toLowerCase().includes(q) || g.alamat.toLowerCase().includes(q));
+    return f.length;
+}
+function nextPage() { if(currentPage * rowsPerPage < filteredCount()) { currentPage++; renderTable(); } }
+function prevPage() { if(currentPage > 1) { currentPage--; renderTable(); } }
+
+// 8. BACKUP & SYSTEM
+function openBackupMenu() { document.getElementById('sysModal').style.display = 'flex'; }
+function closeSysMenu() { document.getElementById('sysModal').style.display = 'none'; }
+function confirmBox(msg, onYes) {
+    document.getElementById('confirm-msg').innerText = msg;
+    document.getElementById('confirm-yes').onclick = () => { closeConfirm(); onYes(); };
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+function closeConfirm() { document.getElementById('confirmModal').style.display = 'none'; }
+function sysAction(n) {
+    if (n === 1) {
+        const blob = new Blob([JSON.stringify({event:eventData, guests:guestsData, target:targetUndangan})], {type:'application/json'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `dejede_backup_${Date.now()}.json`; a.click();
+        closeSysMenu(); toast('✅ Backup diunduh');
+    } else if (n === 2) {
+        const i = document.createElement('input'); i.type = 'file'; i.accept = '.json'; i.onchange = e => {
+            const reader = new FileReader(); reader.onload = () => {
+                try {
+                    const d = JSON.parse(reader.result);
+                    guestsData = d.guests; eventData = d.event; targetUndangan = d.target;
+                    localStorage.setItem('dejedeGuests', JSON.stringify(guestsData));
+                    localStorage.setItem('dejedeEvent', JSON.stringify(eventData));
+                    localStorage.setItem('dejedeTarget', targetUndangan);
+                    location.reload();
+                } catch (err) { toast('⚠ File JSON tidak valid'); }
+            }; reader.readAsText(e.target.files[0]);
+        }; i.click();
+    } else if (n === 3) {
+        closeSysMenu();
+        confirmBox('Hapus seluruh data permanen? Tindakan ini tidak bisa dibatalkan.', () => { localStorage.clear(); location.reload(); });
+    } else if (n === 4) { closeSysMenu(); logoutSystem(); }
+    else if (n === 5) { closeSysMenu(); window.open('display.html', 'dejede-display'); }
+}
+
+// 9. PREVIEW & PRINT
+	function previewTable() {
+	const loader = document.getElementById("loading-preview");
+	if(loader) loader.style.display = "flex";
+    let dataPreview = applySort(currentTab === 'semua' ? guestsData : guestsData.filter(g => g.gender === currentTab));
+    
+    // Hitung Rekap Global
+    const totalUang = dataPreview.reduce((sum, g) => sum + g.jumlah, 0);
+    const jmlPria = dataPreview.filter(g => g.gender === 'Pria').length;
+    const jmlWanita = dataPreview.filter(g => g.gender === 'Wanita').length;
+    
+    const perPage = 40;
+    const totalPages = Math.ceil(dataPreview.length / perPage);
+    let pagesHTML = "";
+
+    // 1. GENERATE HALAMAN DATA TAMU (Sesuai kode stabil sebelumnya)
+    for (let p = 0; p < totalPages; p++) {
+        let start = p * perPage;
+        let end = start + perPage;
+        let pageData = dataPreview.slice(start, end);
+        let rows = "";
+        let subtotal = 0;
+
+        pageData.forEach((g, i) => {
+            subtotal += g.jumlah;
+            rows += `
+            <tr>
+                <td align="center">${start + i + 1}</td>
+                <td>${g.nama}</td>
+                <td>${g.alamat}</td>
+                <td align="center">${g.gender}</td>
+                <td align="right">${formatIDR(g.jumlah)}</td>
+                <td>${g.keterangan || "-"}</td>
+            </tr>`;
+        });
+
+       pagesHTML += `
+<div class="page">
+        <div class="header">
+
+        <div class="header-row">
+
+            <img src="images/logo.png" class="logo" width="36" style="width:36px;height:auto;max-width:36px"
+            onerror="this.src='https://via.placeholder.com/50'">
+
+            <div class="header-text">
+                <div class="title">DEJEDE - BUKU TAMU</div>
+                <div class="subtitle">
+                    Dejede | Photography & Videography | 085236578999
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="event">
+        <div><b>Acara</b> : ${eventData.acara}</div>
+        <div><b>Tuan Rumah</b> : ${eventData.hajat}</div>
+        <div><b>${labelM()}</b> : ${eventData.mempelai}</div>
+        <div><b>Lokasi</b> : ${eventData.alamat}</div>
+        ${sortLabel() ? `<div><b>Urutan</b> : ${sortLabel()}</div>` : ''}
+    </div>
+
+    <table class="tbl-data">
+        <thead>
+            <tr>
+                        <th width="40">No</th>
+                        <th>Nama</th>
+                        <th>Alamat</th>
+                        <th width="80">Gender</th>
+                        <th width="120">Jumlah</th>
+                        <th>Keterangan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                    <tr class="total">
+                        <td colspan="4" align="right">SUBTOTAL HALAMAN ${p + 1}</td>
+                        <td colspan="2" align="right">${formatIDR(subtotal)}</td>
+                    </tr>
+                </tbody>
+            </table>
+			<div class="signature">
+				<div>Mengetahui,<br>Tuan Rumah<br><br><br><b>${eventData.hajat}</b></div>
+				<div class="page-number">Halaman ${p + 1} / ${totalPages}</div>
+			</div>
+        </div>`;
+    }
+
+    // 2. HALAMAN KHUSUS REKAPITULASI DENGAN KETERANGAN TAMBAHAN
+    pagesHTML += `
+    <div class="page">
+<div class="header">
+
+    <div class="header-row">
+
+        <img src="images/logo.png" class="logo" width="36" style="width:36px;height:auto;max-width:36px"
+        onerror="this.src='https://via.placeholder.com/50'">
+
+        <div class="header-text">
+            <div class="title">DEJEDE - REKAPITULASI AKHIR</div>
+            <div class="subtitle">Laporan Ringkasan Keseluruhan</div>
+        </div>
+
+    </div>
+
+</div>
+        
+        <h3 style="text-align:center; margin: 30px 0 10px 0;">RINGKASAN DATA</h3>
+        
+        <table style="width: 90%; margin: 10px auto; font-size: 14px;">
+            <tr>
+                <th style="text-align: left; padding: 12px;">Kategori</th>
+                <th style="padding: 12px;">Keterangan</th>
+            </tr>
+            <tr>
+                <td style="padding: 12px;">Total Tamu Pria</td>
+                <td align="center" style="padding: 12px;">${jmlPria} Orang</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px;">Total Tamu Wanita</td>
+                <td align="center" style="padding: 12px;">${jmlWanita} Orang</td>
+            </tr>
+            <tr class="total">
+                <td style="padding: 15px; font-size: 15px;">TOTAL TAMU KESELURUHAN</td>
+                <td align="center" style="padding: 15px; font-size: 15px;">${dataPreview.length} Orang</td>
+            </tr>
+            <tr class="total">
+                <td style="padding: 15px; font-size: 16px;">TOTAL NOMINAL DITERIMA</td>
+                <td align="right" style="padding: 15px; font-size: 16px;">${formatIDR(totalUang)}</td>
+            </tr>
+        </table>
+
+        <div style="margin: 30px auto; width: 90%; font-size: 13px; line-height: 1.6; color: #333; font-style: italic; border-left: 4px solid #444; padding-left: 15px;">
+            <b>Catatan Rekapitulasi:</b><br>
+            Laporan ini merupakan ringkasan resmi dari acara <b>${eventData.acara}</b> (${labelM()}: ${eventData.mempelai}) dengan tuan rumah Bapak/Ibu <b>${eventData.hajat}</b>. 
+            Terima kasih telah mempercayakan pengelolaan data tamu Anda kepada <b>Aplikasi DEJEDE</b>. Besar harapan kami, laporan ini dapat membantu memberikan transparansi data serta mempermudah Anda dalam proses rekapitulasi akhir acara secara akurat dan profesional.
+        </div>
+
+        <div class="signature" style="margin-top: 50px;">
+            <div>
+                Dicetak otomatis pada:<br>
+                ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+            <div style="text-align: center;">
+                Mengetahui,<br>Tuan Rumah<br><br><br><br>
+                <b>${eventData.hajat}</b>
+            </div>
+        </div>
+        
+        <div style="position: absolute; bottom: 20mm; width: 88%; text-align: center; font-size: 10px; color: #888; border-top: 1px solid #eee; padding-top: 10px;">
+            Dejede | Photography & Videography - Dokumentasi Terbaik Untuk Momen Berharga Anda
+        </div>
+
+        <div class="page-number" style="position: absolute; bottom: 12mm; right: 12mm;">
+            Halaman ${totalPages + 1} / ${totalPages + 1}
+        </div>
+    </div>`;
+
+setTimeout(()=>{
+
+const win = window.open("", "_blank");
+
+win.document.write(`
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laporan Akhir DEJEDE</title>
+<style>
+/* gaya kritis: aktif sebelum table.css selesai dimuat (mencegah logo besar saat load) */
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#ddd}
+img{max-width:100%}
+.logo{width:36px;height:auto;max-width:36px}
+.action-bar{position:fixed;top:0;left:0;right:0;display:flex;justify-content:center;gap:10px;padding:8px 10px;background:rgba(40,44,52,.9)}
+/* proporsi kolom tabel data di tampilan mobile (cetak PDF tidak terpengaruh) */
+@media screen and (max-width:768px){
+.page table.tbl-data{table-layout:fixed;width:100%}
+.page table.tbl-data th:nth-child(1){width:5%}
+.page table.tbl-data th:nth-child(2){width:25%}
+.page table.tbl-data th:nth-child(3){width:20%}
+.page table.tbl-data th:nth-child(4){width:10%}
+.page table.tbl-data th:nth-child(5){width:25%}
+.page table.tbl-data th:nth-child(6){width:15%}
+.page table.tbl-data th,.page table.tbl-data td{overflow-wrap:anywhere;word-break:break-word;padding:2px 2px!important}
+.page table.tbl-data th{font-size:8px!important}
+.page table.tbl-data td{font-size:10px!important}
+}
+</style>
+<link rel="stylesheet" href="table.css">
+<link rel="preload" href="images/logo.png" as="image">
+</head>
+<body>
+
+<div class="action-bar">
+    <button type="button" class="btn-close" onclick="window.close()"><span>✕</span> Tutup</button>
+    <button type="button" class="btn-print" onclick="window.print()"><span>🖨</span> Cetak PDF</button>
+</div>
+
+${pagesHTML}
+
+</body>
+</html>
+`);
+
+win.document.close();
+
+if(loader) loader.style.display="none";
+
+},300);
+
+}
+
+// 10. CHART
+function updateChart() {
+    const ctx = document.getElementById('moneyChart').getContext('2d');
+    if(myChart) myChart.destroy();
+    const last10 = guestsData.slice(-10);
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: last10.map(g => g.nama.split(' ')[0]),
+            datasets: [{ data: last10.map(g => g.jumlah), borderColor: themeColor(), tension: 0.4, fill: true, backgroundColor: themeColor() + '22' }]
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
+    });
+}
+
+function updateRanking() {
+    const top = [...guestsData].sort((a, b) => b.jumlah - a.jumlah).slice(0, 5);
+    document.getElementById('top-donors').innerHTML = top.map(g => `
+        <li style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+            <span>${g.nama}</span><strong>${formatIDR(g.jumlah)}</strong>
+        </li>
+    `).join('');
+}
+
+
+// 11. SUMBANGAN & INFO KEGIATAN
+const tipsSumbangsih = [
+    "Suka dengan fitur baru? Dukung pengembangan DEJEDE agar terus update dengan fitur premium lainnya.",
+    "Aplikasi ini dikembangkan secara mandiri. Sumbangsih kecil Anda sangat berarti untuk biaya server & kopi developer.",
+    "Bantu DEJEDE tetap keren! Dukungan Anda membantu kami fokus menghadirkan update fitur manajemen yang lebih cerdas.",
+    "Mutu aplikasi adalah prioritas kami. Mari berpartisipasi dalam pengembangan sistem yang lebih stabil & cepat."
+];
+
+function showBalloon(title, message) {
+    let balloon = document.getElementById('app-balloon');
+    if (!balloon) {
+        balloon = document.createElement('div');
+        balloon.id = 'app-balloon';
+        balloon.className = 'tutorial-balloon';
+        document.body.appendChild(balloon);
+    }
+
+    let infoRekening = "";
+    let actionButtons = "";
+
+    // Logika Khusus untuk Balon Sumbangsih
+    if (title === "Update & Support") {
+
+        infoRekening = `
+            <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-color);font-family:monospace;font-size:0.7rem;">
+                <b style="color:var(--primary);">🏦 BUY ME COFFE:</b><br>
+                • BRI: 6320-0100-3835-533<br>
+                • A/N: Adi Sofianto<br>
+                • DANA/SPay: 085236578999
+                <div style="margin-top:8px;text-align:center;font-family:Inter,sans-serif;">
+                    <b style="color:var(--primary);font-size:0.7rem;">📱 SCAN QRIS</b><br>
+                    <img src="images/qris.png" alt="QRIS DEJEDE" loading="lazy"
+                         onclick="zoomQris(this.src)"
+                         onerror="this.closest('div').style.display='none'"
+                         style="display:block;width:150px;max-width:100%;height:auto;margin:6px auto 2px;padding:6px;background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.2);cursor:zoom-in;">
+                    <span style="font-size:0.62rem;color:var(--text-muted);">Ketuk gambar untuk memperbesar</span>
+                </div>
+            </div>
+        `;
+
+        actionButtons = `
+            <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;align-items:center;">
+
+                <a href="https://wa.me/6285236578999?text=Halo%20Developer%20DEJEDE,%20saya%20ingin%20berkontribusi..."
+                   target="_blank"
+                   style="
+                   display:flex;
+                   align-items:center;
+                   justify-content:center;
+                   gap:6px;
+                   height:32px;
+                   padding:0 12px;
+                   background:#25d366;
+                   color:white;
+                   border-radius:8px;
+                   font-size:0.75rem;
+                   font-weight:700;
+                   text-decoration:none;
+                   ">
+
+                   <img src="images/wa-icon.svg" style="width:14px;height:14px;">
+                   WhatsApp Dev
+                </a>
+
+                <button class="btn-paham"
+                        onclick="closeBalloon()"
+                        style="height:32px;margin-top:0;">
+                        Paham
+                </button>
+
+            </div>
+        `;
+
+    } else {
+
+        actionButtons = `
+            <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+                <button class="btn-paham" onclick="closeBalloon()" style="margin-top:0;height:32px;">
+                    Paham
+                </button>
+            </div>
+        `;
+
+    }
+
+    balloon.innerHTML = `
+        <div class="balloon-title">✨ ${title}</div>
+        <div class="balloon-text">
+            ${message}
+            ${infoRekening}
+        </div>
+        ${actionButtons}
+    `;
+
+    setTimeout(() => balloon.classList.add('show'), 100);
+}
+
+function closeBalloon() {
+    const balloon = document.getElementById('app-balloon');
+    if (balloon) balloon.classList.remove('show');
+}
+
+// Perbesar gambar QRIS di dalam aplikasi (tanpa pindah halaman)
+function zoomQris(src) {
+    let ov = document.getElementById('qris-zoom');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'qris-zoom';
+        ov.style.cssText = 'position:fixed;inset:0;z-index:10000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;background:rgba(0,0,0,.88);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);cursor:zoom-out;';
+        ov.innerHTML = `
+            <button type="button" aria-label="Tutup" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#fff;font-size:2rem;line-height:1;cursor:pointer;">&times;</button>
+            <img alt="QRIS DEJEDE" style="width:min(92vw,440px);max-height:78vh;object-fit:contain;background:#fff;padding:14px;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+            <div style="color:#fff;font-size:.8rem;text-align:center;opacity:.9;">Scan dengan e-wallet / m-banking &bull; ketuk di mana saja untuk menutup</div>`;
+        ov.addEventListener('click', closeQris);
+        document.body.appendChild(ov);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQris(); });
+    }
+    ov.querySelector('img').src = src;
+    ov.style.display = 'flex';
+}
+function closeQris() {
+    const ov = document.getElementById('qris-zoom');
+    if (ov) ov.style.display = 'none';
+}
+
+// 1. Muncul saat pertama kali login (Tutorial) - HANYA SEKALI
+function showTutorialOnce() {
+
+    const tutorialShown = localStorage.getItem('dejedeTutorialShown');
+
+    if (!tutorialShown) {
+
+        setTimeout(() => {
+            showBalloon(
+                "Tips Penggunaan",
+                `
+                Gunakan fitur <b>Filter</b> untuk melihat statistik tamu 
+                <b>Pria</b> & <b>Wanita</b> secara cepat di dashboard.<br><br>
+
+                Anda juga dapat:
+                • Menggunakan <b>Search</b> untuk menemukan tamu dengan cepat.<br>
+                • Memantau statistik kehadiran langsung dari dashboard.<br>
+                • Mengekspor data tamu untuk dokumentasi acara.<br><br>
+
+                📺 Tutorial lengkap:<br>
+                <a href="https://www.youtube.com/c/dejede" target="_blank"
+                style="color:var(--primary);font-weight:700;text-decoration:none;">
+                www.youtube.com/c/dejede
+                </a>
+                `
+            );
+
+            localStorage.setItem('dejedeTutorialShown', 'true');
+
+        }, 800);
+
+    }
+}
+
+
+// 2. Interval Test (5 Detik)
+setInterval(() => {
+    const randomMsg = tipsSumbangsih[Math.floor(Math.random() * tipsSumbangsih.length)];
+    showBalloon("Update & Support", randomMsg);
+}, 600000);
+
+</script>
+<div id="loading-preview">
+    <div class="loading-box">
+        <div class="spinner"></div>
+        <div class="loading-text">Menyiapkan laporan...</div>
+    </div>
+</div>
+</body>
+</html>
